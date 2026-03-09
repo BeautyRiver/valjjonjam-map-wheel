@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>발쫀잼 맵 랜덤 룰렛</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="noise"></div>
+
+    <main class="app">
+        <section class="hero">
+            <p class="eyebrow">BALJJONJAM CLUB PROJECT</p>
+            <h1>발쫀잼 맵 랜덤 룰렛</h1>
+            <p class="subtext">
+                발로란트 12개 맵 중 하나를 룰렛으로 랜덤 선택해봐.
+            </p>
+        </section>
+
+        <section class="content-grid">
+            <div class="wheel-panel card">
+                <div class="pointer-wrap">
+                    <div class="pointer"></div>
+                </div>
+
+                <div class="wheel-shell">
+                    <svg id="wheel" viewBox="0 0 500 500" aria-label="맵 룰렛"></svg>
+                    <div class="wheel-center">
+                        <span>GO</span>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="info-panel card">
+                <div class="result-box">
+                    <span class="label">선택 결과</span>
+                    <strong id="resultText">?</strong>
+                </div>
+
+                <div class="mode-box">
+                    <div class="mode-top">
+                        <span class="label">룰렛 모드</span>
+                    </div>
+
+                    <label class="toggle-row" for="excludeMode">
+                        <div class="toggle-text-wrap">
+                            <span class="toggle-title">제외 모드</span>
+                            <span class="toggle-desc">이미 나온 맵은 다음부터 제외하고 돌리기</span>
+                        </div>
+
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="excludeMode" />
+                            <span class="slider"></span>
+                        </div>
+                    </label>
+
+                    <div class="mode-status">
+                        <span id="modeStatusText">현재: 기본 모드</span>
+                        <span id="remainingText">남은 맵: 12개</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="spinBtn" class="primary-btn">룰렛 돌리기</button>
+                    <button id="resetBtn" class="secondary-btn">초기화</button>
+                </div>
+
+                <div class="history-box">
+                    <div class="history-header">
+                        <span>최근 결과</span>
+                    </div>
+                    <div id="historyList" class="history-list">
+                        <span class="empty-history">아직 기록이 없어.</span>
+                    </div>
+                </div>
+
+                <div class="used-box">
+                    <div class="history-header">
+                        <span>이미 나온 맵</span>
+                    </div>
+                    <div id="usedList" class="history-list">
+                        <span class="empty-history">아직 나온 맵이 없어.</span>
+                    </div>
+                </div>
+
+                <div class="map-list-box">
+                    <span class="map-list-title">포함 맵</span>
+                    <p>
+                        어센트, 바인드, 브리즈, 헤이븐, 아이스박스, 로터스,
+                        펄, 프랙처, 스플릿, 선셋, 어비스, 코로드
+                    </p>
+                </div>
+            </aside>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
