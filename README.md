@@ -1,2 +1,2 @@
-# baljjonjam-map-wheel
+# valjjonjam-map-wheel
 valorant random map
