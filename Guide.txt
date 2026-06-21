@@ -1,0 +1,7 @@
+다시 켜는 명령어
+
+  프로젝트 폴더에서 터미널 열고:
+  python -m http.server 8000
+  또는 어디서든:
+  python -m http.server 8000 --directory "C:/minkang_github/PRJOECT VAL/valjjonjam-map-wheel"
+  → 브라우저에서 http://localhost:8000

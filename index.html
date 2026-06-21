@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>발쫀잼 맵 랜덤 룰렛</title>
+    <title>발쫀잼 툴킷</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap"
@@ -19,90 +19,234 @@
 
     <main class="app">
         <section class="hero">
-            <p class="eyebrow">BALJJONJAM CLUB PROJECT</p>
-            <h1>발쫀잼 맵 랜덤 룰렛</h1>
+            <p class="eyebrow">vAljjonjAM PROJECT</p>
+            <h1>vAljjonjAM TOOLKIT</h1>
             <p class="subtext">
-                발로란트 12개 맵 중 하나를 룰렛으로 랜덤 선택해봐.
+                맵 랜덤 룰렛과 팀짜기를 한 곳에서.
             </p>
         </section>
 
-        <section class="content-grid">
-            <div class="wheel-panel card">
-                <div class="pointer-wrap">
-                    <div class="pointer"></div>
-                </div>
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="map">🎡 맵 고르기</button>
+            <button class="tab-btn" data-tab="team">⚔️ 팀짜기</button>
+        </nav>
 
-                <div class="wheel-shell">
-                    <svg id="wheel" viewBox="0 0 500 500" aria-label="맵 룰렛"></svg>
-                    <div class="wheel-center">
-                        <span>GO</span>
+        <!-- Tab: 맵 고르기 -->
+        <div id="tab-map" class="tab-content active">
+            <section class="content-grid">
+                <div class="draw-panel card">
+                    <div class="card-deck" id="cardDeck">
+                        <span class="deck-card"></span>
+                        <span class="deck-card"></span>
+                        <span class="deck-card"></span>
+                        <span class="deck-card"></span>
+                        <span class="deck-card deck-top">?</span>
+                    </div>
+                    <div id="drawStage" class="draw-stage">
+                        <div class="draw-hint">아래 <b>맵 뽑기</b>를 눌러<br>맵을 뽑아보세요</div>
                     </div>
                 </div>
+
+                <aside class="info-panel card">
+                    <div class="result-box">
+                        <span class="label">선택 결과</span>
+                        <strong id="resultText">?</strong>
+                    </div>
+
+                    <div class="mode-box">
+                        <div class="mode-top">
+                            <span class="label">룰렛 모드</span>
+                        </div>
+
+                        <label class="toggle-row" for="excludeMode">
+                            <div class="toggle-text-wrap">
+                                <span class="toggle-title">제외 모드</span>
+                                <span class="toggle-desc">이미 나온 맵은 다음부터 제외하고 돌리기</span>
+                            </div>
+
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="excludeMode" />
+                                <span class="slider"></span>
+                            </div>
+                        </label>
+
+                        <div class="mode-status">
+                            <span id="modeStatusText">현재: 기본 모드</span>
+                            <span id="remainingText">남은 맵: 12개</span>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="spinBtn" class="primary-btn">🃏 맵 뽑기</button>
+                        <button id="resetBtn" class="secondary-btn">초기화</button>
+                    </div>
+
+                    <button id="excludeMapsBtn" class="secondary-btn exclude-trigger">🗺️ 맵 제외 설정</button>
+
+                    <div class="history-box">
+                        <div class="history-header">
+                            <span>최근 결과</span>
+                        </div>
+                        <div id="historyList" class="history-list">
+                            <span class="empty-history">아직 기록이 없습니다.</span>
+                        </div>
+                    </div>
+
+                    <div class="used-box">
+                        <div class="history-header">
+                            <span>이미 나온 맵</span>
+                        </div>
+                        <div id="usedList" class="history-list">
+                            <span class="empty-history">아직 나온 맵이 없습니다.</span>
+                        </div>
+                    </div>
+
+                    <div class="map-list-box">
+                        <span class="map-list-title">포함 맵</span>
+                        <p class="map-list-names">
+                            Ascent, Bind, Breeze, Haven, Icebox, Lotus,
+                            Pearl, Fracture, Split, Sunset, Abyss, Corrode
+                        </p>
+                    </div>
+                </aside>
+            </section>
+        </div>
+
+        <!-- Tab: 팀짜기 -->
+        <div id="tab-team" class="tab-content">
+            <div class="team-builder">
+
+                <!-- 컨트롤 영역 -->
+                <div class="team-controls card">
+                    <div class="controls-top">
+                        <input type="text" id="memberSearch" class="search-input" placeholder="이름으로 검색...">
+                        <div class="tier-filters">
+                            <button class="filter-btn active" data-tier="all">전체</button>
+                            <button class="filter-btn" data-tier="불멸">불멸</button>
+                            <button class="filter-btn" data-tier="초월자">초월자</button>
+                            <button class="filter-btn" data-tier="다이아">다이아</button>
+                            <button class="filter-btn" data-tier="플래티넘">플래티넘</button>
+                            <button class="filter-btn" data-tier="골드">골드</button>
+                            <button class="filter-btn" data-tier="실버이하">실버 이하</button>
+                        </div>
+                    </div>
+                    <div class="controls-bottom">
+                        <div class="select-actions">
+                            <button id="reloadMembersBtn" class="sm-btn secondary-btn">🔄 새로고침</button>
+                            <button id="deselectAllBtn" class="sm-btn secondary-btn">전체 해제</button>
+                            <button id="debugPick10Btn" class="sm-btn secondary-btn">🐞 랜덤 10명</button>
+                        </div>
+                        <span id="selectedCount" class="selected-badge">0명 선택됨</span>
+                    </div>
+                </div>
+
+                <!-- 멤버 그리드 -->
+                <div id="memberGrid" class="member-grid"></div>
+
+                <!-- 팀짜기 버튼 -->
+                <div class="team-action-bar">
+                    <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 밸런스 팀짜기</button>
+                    <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
+                    <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
+                </div>
+
+                <!-- 직접 팀짜기 -->
+                <div id="manualSection" class="manual-section hidden">
+                    <div class="manual-teams-preview">
+                        <div class="manual-preview-box card team-a-border">
+                            <span class="manual-preview-label team-a-color">팀 A <span id="manualACount">0명</span></span>
+                            <div id="manualAChips" class="manual-chips"><span class="manual-chip-empty">없음</span></div>
+                        </div>
+                        <div class="manual-preview-box card team-b-border">
+                            <span class="manual-preview-label team-b-color">팀 B <span id="manualBCount">0명</span></span>
+                            <div id="manualBChips" class="manual-chips"><span class="manual-chip-empty">없음</span></div>
+                        </div>
+                    </div>
+                    <div id="manualMemberList" class="manual-member-list card"></div>
+                    <button id="confirmManualBtn" class="primary-btn confirm-manual-btn" disabled>확정하기</button>
+                </div>
+
+                <!-- 결과 -->
+                <div id="teamResult" class="team-result hidden">
+                    <div class="team-result-grid">
+                        <div class="team-card card">
+                            <div class="team-header">
+                                <span class="team-label team-a-color">팀 A</span>
+                                <span id="teamAMeta" class="team-meta"></span>
+                            </div>
+                            <div id="teamAList" class="team-member-list"></div>
+                        </div>
+                        <div class="team-card card">
+                            <div class="team-header">
+                                <span class="team-label team-b-color">팀 B</span>
+                                <span id="teamBMeta" class="team-meta"></span>
+                            </div>
+                            <div id="teamBList" class="team-member-list"></div>
+                        </div>
+                    </div>
+                    <div class="result-actions">
+                        <button id="saveResultBtn" class="primary-btn">💾 보드에 저장</button>
+                        <button id="copyResultBtn" class="secondary-btn">📋 결과 복사하기</button>
+                    </div>
+                </div>
+
+                <!-- 저장 보드 -->
+                <div id="savedBoard" class="saved-board hidden"></div>
+
             </div>
-
-            <aside class="info-panel card">
-                <div class="result-box">
-                    <span class="label">선택 결과</span>
-                    <strong id="resultText">?</strong>
-                </div>
-
-                <div class="mode-box">
-                    <div class="mode-top">
-                        <span class="label">룰렛 모드</span>
-                    </div>
-
-                    <label class="toggle-row" for="excludeMode">
-                        <div class="toggle-text-wrap">
-                            <span class="toggle-title">제외 모드</span>
-                            <span class="toggle-desc">이미 나온 맵은 다음부터 제외하고 돌리기</span>
-                        </div>
-
-                        <div class="toggle-switch">
-                            <input type="checkbox" id="excludeMode" />
-                            <span class="slider"></span>
-                        </div>
-                    </label>
-
-                    <div class="mode-status">
-                        <span id="modeStatusText">현재: 기본 모드</span>
-                        <span id="remainingText">남은 맵: 12개</span>
-                    </div>
-                </div>
-
-                <div class="button-group">
-                    <button id="spinBtn" class="primary-btn">룰렛 돌리기</button>
-                    <button id="resetBtn" class="secondary-btn">초기화</button>
-                </div>
-
-                <div class="history-box">
-                    <div class="history-header">
-                        <span>최근 결과</span>
-                    </div>
-                    <div id="historyList" class="history-list">
-                        <span class="empty-history">아직 기록이 없어.</span>
-                    </div>
-                </div>
-
-                <div class="used-box">
-                    <div class="history-header">
-                        <span>이미 나온 맵</span>
-                    </div>
-                    <div id="usedList" class="history-list">
-                        <span class="empty-history">아직 나온 맵이 없어.</span>
-                    </div>
-                </div>
-
-                <div class="map-list-box">
-                    <span class="map-list-title">포함 맵</span>
-                    <p>
-                        어센트, 바인드, 브리즈, 헤이븐, 아이스박스, 로터스,
-                        펄, 프랙처, 스플릿, 선셋, 어비스, 코로드
-                    </p>
-                </div>
-            </aside>
-        </section>
+        </div>
     </main>
 
+    <!-- 맵 제외 설정 -->
+    <div id="excludeModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-box modal-box-narrow" role="dialog" aria-modal="true" aria-label="맵 제외 설정">
+            <div class="modal-head">
+                <span class="modal-title">🗺️ 맵 제외 설정</span>
+                <button id="excludeModalClose" class="modal-close" aria-label="닫기">✕</button>
+            </div>
+            <p class="exclude-desc">제외할 맵을 누르세요. 제외된 맵은 뽑기에서 빠집니다.</p>
+            <div id="excludeMapGrid" class="exclude-grid"></div>
+            <div class="modal-foot exclude-foot">
+                <button id="excludeResetBtn" class="secondary-btn">전체 포함</button>
+                <button id="excludeDoneBtn" class="primary-btn">완료</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 맵 결과 리빌 -->
+    <div id="mapReveal" class="map-reveal" aria-hidden="true">
+        <div class="map-reveal-card" role="dialog" aria-modal="true" aria-label="선택된 맵">
+            <span class="map-reveal-label">선택된 맵</span>
+            <div class="map-reveal-img-wrap">
+                <img id="mapRevealImg" class="map-reveal-img" src="" alt="">
+            </div>
+            <strong id="mapRevealName" class="map-reveal-name"></strong>
+            <button id="mapRevealClose" class="primary-btn map-reveal-btn">확인</button>
+        </div>
+    </div>
+
+    <!-- 밸런스 후보 모달 -->
+    <div id="balanceModal" class="modal-overlay" aria-hidden="true">
+        <div class="modal-box" role="dialog" aria-modal="true" aria-label="밸런스 후보">
+            <div class="modal-head">
+                <span class="modal-title">⚖️ 밸런스 후보 3가지</span>
+                <button id="balanceModalClose" class="modal-close" aria-label="닫기">✕</button>
+            </div>
+            <div id="balanceModalList" class="modal-options"></div>
+            <div class="modal-foot">
+                <button id="rerollBalanceBtn" class="reroll-btn primary-btn">
+                    <span class="reroll-dice">🎲</span> 다시 짜기
+                </button>
+                <button id="saveMinDiffBtn" class="foot-btn secondary-btn">🎯 최저 점수차 저장</button>
+                <button id="saveRandomBtn" class="foot-btn secondary-btn">🎲 랜덤 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase (compat 빌드: 전역 firebase 객체 제공) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 
