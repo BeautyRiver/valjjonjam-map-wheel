@@ -10,7 +10,8 @@ const maps = [
   "Split",
   "Sunset",
   "Abyss",
-  "Corrode"
+  "Corrode",
+  "Summit"
 ];
 
 // 맵 이름 → PNG 슬러그 (영문 소문자가 파일명과 동일)

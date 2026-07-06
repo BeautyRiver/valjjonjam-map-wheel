@@ -3,17 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
+    // 멤버 정보 컬렉션.
+    // - 웹(팀짜기 탭)은 users를 "읽기"만 함 → 읽기 허용
+    // - 저장/수정/삭제는 디스코드 봇만 수행하는데,
+    //   봇은 Admin SDK(serviceAccountKey.json)로 접속해서 이 규칙을 무시함
+    //   → 클라이언트 쓰기는 전부 차단해도 봇 동작에는 영향 없음
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 그 외 모든 경로는 클라이언트 접근 전면 차단
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 7, 7);
+      allow read, write: if false;
     }
   }
 }
