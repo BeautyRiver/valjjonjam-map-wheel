@@ -302,6 +302,59 @@ function tierScore(tier) {
   return TIER_SCORE[normalizeTier(tier)] ?? 0;
 }
 
+// 내전·5인큐 기록으로 정리한 발쫀잼 내부 티어.
+// ? 표시는 유지하되 점수는 같은 티어의 -하와 동일하게 계산한다.
+const INTERNAL_TIER_INFO = {
+  "1":  { label: "1티어", score: 10, level: 1 },
+  "2상": { label: "2티어 -상", score: 9, level: 2 },
+  "2하": { label: "2티어 -하", score: 8, level: 2 },
+  "3상": { label: "3티어 -상", score: 7, level: 3 },
+  "3하": { label: "3티어 -하", score: 6, level: 3 },
+  "4상": { label: "4티어 -상", score: 5, level: 4 },
+  "4하": { label: "4티어 -하", score: 4, level: 4 },
+  "4?":  { label: "4티어 ?", score: 4, level: 4 },
+  "5상": { label: "5티어 -상", score: 3, level: 5 },
+  "5하": { label: "5티어 -하", score: 2, level: 5 },
+  "5?":  { label: "5티어 ?", score: 2, level: 5 }
+};
+
+function normalizeMemberName(name) {
+  return (name || "").replace(/\s+/g, "");
+}
+
+const INTERNAL_TIER_ORDER = Object.fromEntries(
+  Object.keys(INTERNAL_TIER_INFO).map((tier, index) => [tier, index])
+);
+
+const SCORE_MODE_GAME = "game";
+const SCORE_MODE_INTERNAL = "internal";
+let activeScoreMode = SCORE_MODE_GAME;
+
+function internalTierBadgeHtml(internalTier) {
+  const info = INTERNAL_TIER_INFO[internalTier];
+  if (!info) {
+    return `<span class="internal-tier-badge internal-tier-unknown">내부 미분류</span>`;
+  }
+  return `<span class="internal-tier-badge internal-tier-${info.level}">${info.label}</span>`;
+}
+
+function scoreModeLabel(scoreMode) {
+  return scoreMode === SCORE_MODE_INTERNAL ? "발쫀잼 티어" : "인게임 티어";
+}
+
+function memberScore(member, scoreMode = activeScoreMode) {
+  if (scoreMode === SCORE_MODE_INTERNAL) {
+    return INTERNAL_TIER_INFO[member.internalTier]?.score ?? 0;
+  }
+  return tierScore(member.tier);
+}
+
+function memberTierBadgeHtml(member, scoreMode = activeScoreMode) {
+  return scoreMode === SCORE_MODE_INTERNAL
+    ? internalTierBadgeHtml(member.internalTier)
+    : tierBadgeHtml(member.tier);
+}
+
 // Fisher-Yates 셔플 (배열을 직접 섞고 반환)
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -365,12 +418,14 @@ function tierBadgeHtml(tier) {
 const MAX_SELECT = 10;            // 최대 선택 인원
 const selectedIndices = new Set();
 let activeFilter = "all";
+let activeInternalFilter = "all";
 let activeSearch = "";
 
 const memberGridEl   = document.getElementById("memberGrid");
 const memberSearchEl = document.getElementById("memberSearch");
 const selectedCountEl = document.getElementById("selectedCount");
 const balanceTeamBtn  = document.getElementById("balanceTeamBtn");
+const internalBalanceTeamBtn = document.getElementById("internalBalanceTeamBtn");
 const randomTeamBtn   = document.getElementById("randomTeamBtn");
 const manualTeamBtn   = document.getElementById("manualTeamBtn");
 const manualSectionEl = document.getElementById("manualSection");
@@ -387,6 +442,7 @@ const teamBListEl    = document.getElementById("teamBList");
 const teamAMetaEl    = document.getElementById("teamAMeta");
 const teamBMetaEl    = document.getElementById("teamBMeta");
 const copyResultBtn  = document.getElementById("copyResultBtn");
+const copyInternalTiersBtn = document.getElementById("copyInternalTiersBtn");
 const saveResultBtn  = document.getElementById("saveResultBtn");
 
 function getFilteredMembers() {
@@ -404,7 +460,9 @@ function getFilteredMembers() {
         matchTier = m.tier.startsWith(activeFilter);
       }
     }
-    return matchSearch && matchTier;
+    const matchInternalTier = activeInternalFilter === "all"
+      || INTERNAL_TIER_INFO[m.internalTier]?.level === Number(activeInternalFilter);
+    return matchSearch && matchTier && matchInternalTier;
   });
 }
 
@@ -435,6 +493,7 @@ function renderMemberGrid() {
         </div>
         <div class="member-badges">
           ${tierBadgeHtml(m.tier)}
+          ${internalTierBadgeHtml(m.internalTier)}
           ${posBadges}
         </div>
       </div>
@@ -467,6 +526,7 @@ function updateSelectedCount() {
   selectedCountEl.classList.toggle("at-limit", count >= MAX_SELECT);
   const ok = count >= 2;
   balanceTeamBtn.disabled = !ok;
+  internalBalanceTeamBtn.disabled = count !== MAX_SELECT;
   randomTeamBtn.disabled  = !ok;
   manualTeamBtn.disabled  = !ok;
 }
@@ -486,7 +546,7 @@ function buildTeams(method) {
   const pool = [...selectedIndices].map(i => members[i]);
 
   if (method === "balance") {
-    pool.sort((a, b) => tierScore(b.tier) - tierScore(a.tier));
+    pool.sort((a, b) => memberScore(b) - memberScore(a));
   } else {
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -509,12 +569,12 @@ function buildTeams(method) {
   return { teamA, teamB };
 }
 
-function teamScore(team) {
-  return team.reduce((s, m) => s + tierScore(m.tier), 0);
+function teamScore(team, scoreMode = activeScoreMode) {
+  return team.reduce((s, m) => s + memberScore(m, scoreMode), 0);
 }
 
 // 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달)
-function teamRowsHtml(team) {
+function teamRowsHtml(team, scoreMode = activeScoreMode) {
   return team.map(m => {
     const namePrefix = m.studentId ? `${m.studentId} ` : "";
     const riot = m.riotId ? `<span class="team-member-riot">${m.riotId}</span>` : "";
@@ -524,15 +584,15 @@ function teamRowsHtml(team) {
         <span class="team-member-name">${namePrefix}${m.name}</span>
         ${riot}
       </div>
-      <span class="team-member-tier">${tierBadgeHtml(m.tier)}</span>
+      <span class="team-member-tier">${memberTierBadgeHtml(m, scoreMode)}</span>
     </div>
   `;
   }).join("");
 }
 
 // 팀 A/B 풀 상세 그리드 HTML (결과 화면과 동일한 모양)
-function teamGridHtml(teamA, teamB) {
-  const sA = teamScore(teamA), sB = teamScore(teamB);
+function teamGridHtml(teamA, teamB, scoreMode = activeScoreMode) {
+  const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
   return `
     <div class="team-result-grid">
       <div class="team-card card">
@@ -540,40 +600,41 @@ function teamGridHtml(teamA, teamB) {
           <span class="team-label team-a-color">팀 A</span>
           <span class="team-meta">${teamA.length}명 · 점수 ${sA}</span>
         </div>
-        <div class="team-member-list">${teamRowsHtml(teamA)}</div>
+        <div class="team-member-list">${teamRowsHtml(teamA, scoreMode)}</div>
       </div>
       <div class="team-card card">
         <div class="team-header">
           <span class="team-label team-b-color">팀 B</span>
           <span class="team-meta">${teamB.length}명 · 점수 ${sB}</span>
         </div>
-        <div class="team-member-list">${teamRowsHtml(teamB)}</div>
+        <div class="team-member-list">${teamRowsHtml(teamB, scoreMode)}</div>
       </div>
     </div>
   `;
 }
 
-function renderTeamList(container, team) {
-  container.innerHTML = teamRowsHtml(team);
+function renderTeamList(container, team, scoreMode = activeScoreMode) {
+  container.innerHTML = teamRowsHtml(team, scoreMode);
 }
 
 // 결과 복사용으로 마지막 팀 구성 보관
-let lastTeams = { teamA: [], teamB: [] };
+let lastTeams = { teamA: [], teamB: [], scoreMode: SCORE_MODE_GAME };
 
 // 팀 내부를 티어 내림차순으로 정렬
-function sortByTier(team) {
-  return [...team].sort((a, b) => tierScore(b.tier) - tierScore(a.tier));
+function sortByTier(team, scoreMode = activeScoreMode) {
+  return [...team].sort((a, b) => memberScore(b, scoreMode) - memberScore(a, scoreMode));
 }
 
-function displayTeams(teamA, teamB) {
-  teamA = sortByTier(teamA);
-  teamB = sortByTier(teamB);
-  lastTeams = { teamA, teamB };
-  const sA = teamScore(teamA), sB = teamScore(teamB);
-  teamAMetaEl.textContent = `${teamA.length}명 · 점수 ${sA}`;
-  teamBMetaEl.textContent = `${teamB.length}명 · 점수 ${sB}`;
-  renderTeamList(teamAListEl, teamA);
-  renderTeamList(teamBListEl, teamB);
+function displayTeams(teamA, teamB, scoreMode = activeScoreMode) {
+  activeScoreMode = scoreMode;
+  teamA = sortByTier(teamA, scoreMode);
+  teamB = sortByTier(teamB, scoreMode);
+  lastTeams = { teamA, teamB, scoreMode };
+  const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
+  teamAMetaEl.textContent = `${teamA.length}명 · ${scoreModeLabel(scoreMode)} ${sA}점`;
+  teamBMetaEl.textContent = `${teamB.length}명 · ${scoreModeLabel(scoreMode)} ${sB}점`;
+  renderTeamList(teamAListEl, teamA, scoreMode);
+  renderTeamList(teamBListEl, teamB, scoreMode);
   teamResultEl.classList.remove("hidden");
   teamResultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -594,13 +655,76 @@ memberSearchEl.addEventListener("input", () => {
   renderMemberGrid();
 });
 
-// 티어 필터
-document.querySelectorAll(".filter-btn").forEach(btn => {
+// 인게임 티어 필터
+document.querySelectorAll(".game-tier-filter").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".game-tier-filter").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     activeFilter = btn.dataset.tier;
     renderMemberGrid();
+  });
+});
+
+// 발쫀잼 내부 티어 필터
+document.querySelectorAll(".internal-tier-filter").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".internal-tier-filter").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeInternalFilter = btn.dataset.internalTier;
+    renderMemberGrid();
+  });
+});
+
+function buildInternalTierExportText() {
+  const uniqueMembers = new Map();
+  members.forEach(member => {
+    const nameKey = normalizeMemberName(member.name);
+    uniqueMembers.set(nameKey, member);
+  });
+
+  return [...uniqueMembers.values()]
+    .filter(member => member.internalTier)
+    .sort((a, b) => {
+      const tierDiff = INTERNAL_TIER_ORDER[a.internalTier] - INTERNAL_TIER_ORDER[b.internalTier];
+      if (tierDiff !== 0) return tierDiff;
+      return a.name.localeCompare(b.name, "ko");
+    })
+    .map(member => {
+      const tier = member.internalTier;
+      const info = INTERNAL_TIER_INFO[tier];
+      const tierLabel = tier.endsWith("?") ? info.label.replace(" ?", " -?") : info.label;
+      return `${member.name} ${tierLabel}`;
+    })
+    .join("\n");
+}
+
+function copyTextToClipboard(text) {
+  const fallbackCopy = () => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied ? Promise.resolve() : Promise.reject(new Error("copy failed"));
+  };
+
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).catch(fallbackCopy);
+  }
+  return fallbackCopy();
+}
+
+copyInternalTiersBtn.addEventListener("click", () => {
+  copyTextToClipboard(buildInternalTierExportText()).then(() => {
+    copyInternalTiersBtn.textContent = "✅ 명단 복사됨!";
+    setTimeout(() => { copyInternalTiersBtn.textContent = "📋 발쫀잼 티어 복사"; }, 2000);
+  }).catch(() => {
+    copyInternalTiersBtn.textContent = "복사 실패";
+    setTimeout(() => { copyInternalTiersBtn.textContent = "📋 발쫀잼 티어 복사"; }, 2000);
   });
 });
 
@@ -624,7 +748,7 @@ document.getElementById("debugPick10Btn").addEventListener("click", () => {
 // ===== 밸런스 팀짜기: 점수차 최소인 구성 1개 (누를 때마다 새로) =====
 
 function sumScore(ids) {
-  return ids.reduce((s, i) => s + tierScore(members[i].tier), 0);
+  return ids.reduce((s, i) => s + memberScore(members[i]), 0);
 }
 
 // A/B 순서·좌우 뒤집힘을 같은 구성으로 보는 키
@@ -671,6 +795,7 @@ function buildBalancedCandidates() {
 // ===== 밸런스 후보 모달 (3가지 + 다시 짜기) =====
 
 const balanceModalEl     = document.getElementById("balanceModal");
+const balanceModalTitleEl = document.getElementById("balanceModalTitle");
 const balanceModalListEl = document.getElementById("balanceModalList");
 const balanceModalCloseEl = document.getElementById("balanceModalClose");
 const rerollBalanceBtn   = document.getElementById("rerollBalanceBtn");
@@ -792,6 +917,9 @@ function saveCandidate(c, btn) {
 }
 
 function openBalanceModal() {
+  balanceModalTitleEl.textContent = activeScoreMode === SCORE_MODE_INTERNAL
+    ? "🏆 발쫀잼 티어 밸런스 후보 3가지"
+    : "⚖️ 인게임 티어 밸런스 후보 3가지";
   renderModalTrio();
   balanceModalEl.classList.add("open");
   balanceModalEl.setAttribute("aria-hidden", "false");
@@ -804,6 +932,26 @@ function closeBalanceModal() {
 
 balanceTeamBtn.addEventListener("click", () => {
   manualSectionEl.classList.add("hidden");
+  activeScoreMode = SCORE_MODE_GAME;
+  openBalanceModal();
+});
+
+internalBalanceTeamBtn.addEventListener("click", () => {
+  const missing = [...selectedIndices]
+    .map(i => members[i])
+    .filter(member => !member.internalTier);
+  if (missing.length) {
+    selectedCountEl.textContent = `내부 티어 미분류: ${missing.map(m => m.name).join(", ")}`;
+    selectedCountEl.classList.add("limit-warn");
+    clearTimeout(internalBalanceTeamBtn._warningTimer);
+    internalBalanceTeamBtn._warningTimer = setTimeout(() => {
+      selectedCountEl.classList.remove("limit-warn");
+      updateSelectedCount();
+    }, 2200);
+    return;
+  }
+  manualSectionEl.classList.add("hidden");
+  activeScoreMode = SCORE_MODE_INTERNAL;
   openBalanceModal();
 });
 
@@ -838,8 +986,9 @@ document.addEventListener("keydown", (e) => {
 
 randomTeamBtn.addEventListener("click", () => {
   manualSectionEl.classList.add("hidden");
+  activeScoreMode = SCORE_MODE_GAME;
   const { teamA, teamB } = buildTeams("random");
-  displayTeams(teamA, teamB);
+  displayTeams(teamA, teamB, SCORE_MODE_GAME);
 });
 
 // 직접 팀짜기
@@ -910,24 +1059,30 @@ confirmManualBtn.addEventListener("click", () => {
   const teamA = [...selectedIndices].filter(i => manualAssign[i] === "A").map(i => members[i]);
   const teamB = [...selectedIndices].filter(i => manualAssign[i] === "B").map(i => members[i]);
   manualSectionEl.classList.add("hidden");
-  displayTeams(teamA, teamB);
+  displayTeams(teamA, teamB, SCORE_MODE_GAME);
 });
 
-// 결과 복사 (lastTeams 데이터 기반: 학번 이름 발로ID - 티어)
-function memberLine(m) {
+// 결과 복사 (lastTeams 데이터 기반: 학번 이름 발로ID - 선택한 밸런스 티어)
+function memberLine(m, scoreMode) {
   const sid = m.studentId ? `${m.studentId} ` : "";
   const riot = m.riotId ? ` ${m.riotId}` : "";
-  return `  ${sid}${m.name}${riot} - ${normalizeTier(m.tier)}`;
+  const tierLabel = scoreMode === SCORE_MODE_INTERNAL
+    ? (INTERNAL_TIER_INFO[m.internalTier]?.label || "내부 미분류")
+    : normalizeTier(m.tier);
+  return `  ${sid}${m.name}${riot} - ${tierLabel}`;
 }
 
 copyResultBtn.addEventListener("click", () => {
-  const aRows = lastTeams.teamA.map(memberLine);
-  const bRows = lastTeams.teamB.map(memberLine);
+  const aRows = lastTeams.teamA.map(m => memberLine(m, lastTeams.scoreMode));
+  const bRows = lastTeams.teamB.map(m => memberLine(m, lastTeams.scoreMode));
 
-  const text = `팀 A (점수: ${teamAMetaEl.textContent})\n${aRows.join("\n")}\n\n팀 B (점수: ${teamBMetaEl.textContent})\n${bRows.join("\n")}`;
+  const text = `[${scoreModeLabel(lastTeams.scoreMode)} 기준]\n팀 A (${teamAMetaEl.textContent})\n${aRows.join("\n")}\n\n팀 B (${teamBMetaEl.textContent})\n${bRows.join("\n")}`;
 
-  navigator.clipboard.writeText(text).then(() => {
+  copyTextToClipboard(text).then(() => {
     copyResultBtn.textContent = "✅ 복사됨!";
+    setTimeout(() => { copyResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
+  }).catch(() => {
+    copyResultBtn.textContent = "복사 실패";
     setTimeout(() => { copyResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
   });
 });
@@ -935,7 +1090,7 @@ copyResultBtn.addEventListener("click", () => {
 // ===== 저장 보드 (최대 5개) =====
 
 const MAX_SAVED = 5;
-let savedResults = [];   // { teamA, teamB, sA, sB, diff, key }
+let savedResults = [];   // { teamA, teamB, sA, sB, diff, key, scoreMode }
 
 function flashSaveBtn(text) {
   const old = saveResultBtn.textContent;
@@ -956,19 +1111,19 @@ function teamsKey(teamA, teamB) {
 }
 
 // 보드에 저장 (중복/가득참 검사). 반환: "ok" | "dup" | "full" | "empty"
-function saveTeams(teamA, teamB) {
+function saveTeams(teamA, teamB, scoreMode = activeScoreMode) {
   if (!teamA.length && !teamB.length) return "empty";
   const key = teamsKey(teamA, teamB);
   if (savedResults.some(r => r.key === key)) return "dup";
   if (savedResults.length >= MAX_SAVED) return "full";
-  const sA = teamScore(teamA), sB = teamScore(teamB);
-  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key });
+  const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
+  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key, scoreMode });
   renderSavedBoard();
   return "ok";
 }
 
 saveResultBtn.addEventListener("click", () => {
-  const status = saveTeams(lastTeams.teamA, lastTeams.teamB);
+  const status = saveTeams(lastTeams.teamA, lastTeams.teamB, lastTeams.scoreMode);
   if (status === "dup")  flashSaveBtn("이미 저장된 구성!");
   else if (status === "full") flashSaveBtn(`최대 ${MAX_SAVED}개까지!`);
   else if (status === "ok")   flashSaveBtn("✅ 저장됨!");
@@ -994,7 +1149,7 @@ function renderSavedBoard() {
     ${savedResults.map((r, idx) => `
       <div class="saved-item card" data-idx="${idx}">
         <div class="saved-item-head">
-          <span class="saved-item-title">#${idx + 1}</span>
+          <span class="saved-item-title">#${idx + 1} · ${scoreModeLabel(r.scoreMode)}</span>
           <span class="opt-diff">점수차 ${r.diff}</span>
         </div>
         <div class="opt-team"><span class="opt-tag team-a-color">A · ${r.teamA.length}명 · ${r.sA}점</span> ${namesOf(r.teamA)}</div>
@@ -1010,7 +1165,7 @@ function renderSavedBoard() {
   savedBoardEl.querySelectorAll(".saved-load").forEach(btn => {
     btn.addEventListener("click", () => {
       const r = savedResults[parseInt(btn.dataset.idx)];
-      if (r) displayTeams(r.teamA, r.teamB);
+      if (r) displayTeams(r.teamA, r.teamB, r.scoreMode);
     });
   });
   savedBoardEl.querySelectorAll(".saved-del").forEach(btn => {
@@ -1059,6 +1214,7 @@ async function loadMembers() {
 
   showMemberMessage("멤버 불러오는 중...");
   if (reloadMembersBtn) reloadMembersBtn.disabled = true;
+  copyInternalTiersBtn.disabled = true;
 
   try {
     const snap = await firebase.firestore().collection("users").get();
@@ -1066,11 +1222,13 @@ async function loadMembers() {
     snap.forEach(doc => {
       const d = doc.data() || {};
       if (!d.name) return;
+      const storedInternalTier = INTERNAL_TIER_INFO[d.internal_tier] ? d.internal_tier : null;
       loaded.push({
         name: d.name,
         studentId: d.student_id || "",
         riotId: d.riot_id || "",
         tier: d.tier || "언랭",
+        internalTier: storedInternalTier,
         positions: Array.isArray(d.role) ? d.role : (d.role ? [d.role] : [])
       });
     });
@@ -1084,6 +1242,7 @@ async function loadMembers() {
     } else {
       renderMemberGrid();
     }
+    copyInternalTiersBtn.disabled = !members.some(member => member.internalTier);
     updateSelectedCount();
   } catch (e) {
     console.error("[users] 불러오기 실패:", e);

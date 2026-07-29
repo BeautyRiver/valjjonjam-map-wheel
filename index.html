@@ -120,14 +120,24 @@
                 <div class="team-controls card">
                     <div class="controls-top">
                         <input type="text" id="memberSearch" class="search-input" placeholder="이름으로 검색...">
-                        <div class="tier-filters">
-                            <button class="filter-btn active" data-tier="all">전체</button>
-                            <button class="filter-btn" data-tier="불멸">불멸</button>
-                            <button class="filter-btn" data-tier="초월자">초월자</button>
-                            <button class="filter-btn" data-tier="다이아">다이아</button>
-                            <button class="filter-btn" data-tier="플래티넘">플래티넘</button>
-                            <button class="filter-btn" data-tier="골드">골드</button>
-                            <button class="filter-btn" data-tier="실버이하">실버 이하</button>
+                        <div class="tier-filters" aria-label="인게임 티어 필터">
+                            <span class="filter-label">인게임</span>
+                            <button class="filter-btn game-tier-filter active" data-tier="all">전체</button>
+                            <button class="filter-btn game-tier-filter" data-tier="불멸">불멸</button>
+                            <button class="filter-btn game-tier-filter" data-tier="초월자">초월자</button>
+                            <button class="filter-btn game-tier-filter" data-tier="다이아">다이아</button>
+                            <button class="filter-btn game-tier-filter" data-tier="플래티넘">플래티넘</button>
+                            <button class="filter-btn game-tier-filter" data-tier="골드">골드</button>
+                            <button class="filter-btn game-tier-filter" data-tier="실버이하">실버 이하</button>
+                        </div>
+                        <div class="tier-filters internal-tier-filters" aria-label="발쫀잼 티어 필터">
+                            <span class="filter-label">발쫀잼</span>
+                            <button class="filter-btn internal-tier-filter active" data-internal-tier="all">전체</button>
+                            <button class="filter-btn internal-tier-filter" data-internal-tier="1">1티어</button>
+                            <button class="filter-btn internal-tier-filter" data-internal-tier="2">2티어</button>
+                            <button class="filter-btn internal-tier-filter" data-internal-tier="3">3티어</button>
+                            <button class="filter-btn internal-tier-filter" data-internal-tier="4">4티어</button>
+                            <button class="filter-btn internal-tier-filter" data-internal-tier="5">5티어</button>
                         </div>
                     </div>
                     <div class="controls-bottom">
@@ -135,9 +145,14 @@
                             <button id="reloadMembersBtn" class="sm-btn secondary-btn">🔄 새로고침</button>
                             <button id="deselectAllBtn" class="sm-btn secondary-btn">전체 해제</button>
                             <button id="debugPick10Btn" class="sm-btn secondary-btn">🐞 랜덤 10명</button>
+                            <button id="copyInternalTiersBtn" class="sm-btn secondary-btn" disabled>📋 발쫀잼 티어 복사</button>
                         </div>
                         <span id="selectedCount" class="selected-badge">0명 선택됨</span>
                     </div>
+                    <p class="internal-tier-guide">
+                        🏆 발쫀잼 티어 점수: 1티어 10점 · 2상/하 9/8점 · 3상/하 7/6점 ·
+                        4상/하 5/4점 · 5상/하 3/2점 · <strong>?는 -하와 동일</strong>
+                    </p>
                 </div>
 
                 <!-- 멤버 그리드 -->
@@ -145,7 +160,8 @@
 
                 <!-- 팀짜기 버튼 -->
                 <div class="team-action-bar">
-                    <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 밸런스 팀짜기</button>
+                    <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 인게임 티어 밸런스</button>
+                    <button id="internalBalanceTeamBtn" class="primary-btn" title="10명 선택 시 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
                     <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
                     <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
                 </div>
@@ -229,7 +245,7 @@
     <div id="balanceModal" class="modal-overlay" aria-hidden="true">
         <div class="modal-box" role="dialog" aria-modal="true" aria-label="밸런스 후보">
             <div class="modal-head">
-                <span class="modal-title">⚖️ 밸런스 후보 3가지</span>
+                <span id="balanceModalTitle" class="modal-title">⚖️ 밸런스 후보 3가지</span>
                 <button id="balanceModalClose" class="modal-close" aria-label="닫기">✕</button>
             </div>
             <div id="balanceModalList" class="modal-options"></div>

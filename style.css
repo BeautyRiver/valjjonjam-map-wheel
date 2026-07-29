@@ -523,8 +523,20 @@ button:disabled {
 
 .tier-filters {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.filter-label {
+  min-width: 52px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.internal-tier-filters .filter-label {
+  color: #ffd166;
 }
 
 .filter-btn {
@@ -554,8 +566,24 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.internal-tier-guide {
+  margin: -2px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--muted);
+  background: rgba(255, 209, 102, 0.07);
+  border: 1px solid rgba(255, 209, 102, 0.16);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.internal-tier-guide strong {
+  color: #ffd166;
+}
+
 .select-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -734,6 +762,22 @@ button:disabled {
 .tier-radiant   { background: rgba(255, 255, 102, 0.18); color: #ffe14d; border: 1px solid rgba(255, 255, 102, 0.4); }
 .tier-unranked  { background: rgba(108, 117, 125, 0.2); color: #8c96a0; border: 1px solid rgba(108, 117, 125, 0.35); }
 
+.internal-tier-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.internal-tier-1 { background: rgba(255, 209, 102, 0.2); color: #ffd166; }
+.internal-tier-2 { background: rgba(255, 140, 66, 0.18); color: #ff9a5c; }
+.internal-tier-3 { background: rgba(82, 217, 129, 0.16); color: #65df91; }
+.internal-tier-4 { background: rgba(79, 140, 255, 0.16); color: #76adff; }
+.internal-tier-5 { background: rgba(173, 181, 189, 0.13); color: #bcc4cf; }
+.internal-tier-unknown { background: rgba(108, 117, 125, 0.12); color: #8c96a0; }
+
 /* ===== POSITION CHIPS ===== */
 .pos-chip {
   display: inline-block;
@@ -752,7 +796,7 @@ button:disabled {
 /* ===== TEAM ACTION BAR ===== */
 .team-action-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
