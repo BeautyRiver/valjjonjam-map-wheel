@@ -1179,6 +1179,24 @@ function renderSavedBoard() {
 // ===== Firestore 연동 =====
 
 const reloadMembersBtn = document.getElementById("reloadMembersBtn");
+const reloadRecruitmentsBtn = document.getElementById("reloadRecruitmentsBtn");
+const recruitmentSelectEl = document.getElementById("recruitmentSelect");
+const buildRecruitmentTeamsBtn = document.getElementById("buildRecruitmentTeamsBtn");
+const recruitmentStatusEl = document.getElementById("recruitmentStatus");
+const recruitmentResultEl = document.getElementById("recruitmentResult");
+const recruitmentResultTitleEl = document.getElementById("recruitmentResultTitle");
+const recruitmentResultSummaryEl = document.getElementById("recruitmentResultSummary");
+const recruitmentTeamGridEl = document.getElementById("recruitmentTeamGrid");
+const recruitmentReserveListEl = document.getElementById("recruitmentReserveList");
+const rerollRecruitmentTeamsBtn = document.getElementById("rerollRecruitmentTeamsBtn");
+const copyRecruitmentResultBtn = document.getElementById("copyRecruitmentResultBtn");
+
+const TOOLKIT_RECRUITMENT_COLLECTION = "toolkit_recruitments";
+const MULTI_TEAM_CANDIDATE_TRIALS = 2000;
+const MULTI_TEAM_COLORS = ["#ff4655", "#7c5cff", "#00c8ee", "#52d981", "#ffd166", "#ff8f70"];
+
+let recruitments = [];
+let lastRecruitmentResult = null;
 
 function showMemberMessage(msg) {
   memberGridEl.innerHTML = `<div class="no-results">${msg}</div>`;
@@ -1200,6 +1218,369 @@ function initFirebase() {
   }
   return true;
 }
+
+function timestampMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatRecruitmentTime(value) {
+  const millis = timestampMillis(value);
+  if (!millis) return "시간 미정";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(new Date(millis));
+}
+
+function recruitmentTypeLabel(recruitment) {
+  if (recruitment.kind === "event") return "발쫀컵";
+  if (recruitment.maxMembers === 10) return "내전";
+  if (recruitment.maxMembers === 5) return "5인큐";
+  return "파티";
+}
+
+function recruitmentStatusLabel(recruitment) {
+  if (timestampMillis(recruitment.scheduledAt) <= Date.now()) return "마감";
+  if (recruitment.status === "closed") return "마감";
+  if (recruitment.status === "full") return "정원 마감";
+  return "모집 중";
+}
+
+function setRecruitmentStatus(message, tone = "") {
+  recruitmentStatusEl.textContent = message;
+  recruitmentStatusEl.className = `recruitment-status${tone ? ` ${tone}` : ""}`;
+}
+
+function selectedRecruitment() {
+  return recruitments.find(item => item.id === recruitmentSelectEl.value) || null;
+}
+
+function analyzeRecruitment(recruitment) {
+  const seen = new Set();
+  const participantIds = recruitment.memberIds.filter(id => {
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const teamCount = Math.floor(participantIds.length / 5);
+  const mainIds = participantIds.slice(0, teamCount * 5);
+  const reserveIds = participantIds.slice(teamCount * 5);
+  const membersByDiscordId = new Map(members.map(member => [member.discordId, member]));
+  const mainMembers = mainIds.map(id => membersByDiscordId.get(id)).filter(Boolean);
+  const missingMainIds = mainIds.filter(id => !membersByDiscordId.has(id));
+  const missingTierMembers = mainMembers.filter(member => !member.internalTier);
+  const reserves = reserveIds.map(id => ({ id, member: membersByDiscordId.get(id) || null }));
+
+  return {
+    participantIds,
+    teamCount,
+    mainMembers,
+    missingMainIds,
+    missingTierMembers,
+    reserves
+  };
+}
+
+function refreshRecruitmentPreview() {
+  const recruitment = selectedRecruitment();
+  recruitmentResultEl.classList.add("hidden");
+  lastRecruitmentResult = null;
+  buildRecruitmentTeamsBtn.disabled = true;
+
+  if (!recruitment) {
+    setRecruitmentStatus("모집을 선택하면 참가 인원과 편성 가능 여부를 확인할 수 있어요.");
+    return;
+  }
+
+  const analysis = analyzeRecruitment(recruitment);
+  const participantCount = analysis.participantIds.length;
+  if (analysis.teamCount < 2) {
+    setRecruitmentStatus(
+      `${participantCount}명 참가 · 2팀 구성까지 ${10 - participantCount}명이 더 필요해요.`,
+      "warning"
+    );
+    return;
+  }
+  if (analysis.missingMainIds.length) {
+    setRecruitmentStatus(
+      `본선 참가자 ${analysis.missingMainIds.length}명의 /기본설정 정보가 없어 자동 편성할 수 없어요.`,
+      "error"
+    );
+    return;
+  }
+  if (analysis.missingTierMembers.length) {
+    setRecruitmentStatus(
+      `내부 티어 미설정: ${analysis.missingTierMembers.map(member => member.name).join(", ")} · /내부티어설정 후 새로고침해주세요.`,
+      "error"
+    );
+    return;
+  }
+
+  const reserveText = analysis.reserves.length ? ` · 후보 ${analysis.reserves.length}명` : "";
+  setRecruitmentStatus(
+    `${participantCount}명 참가 · 선착순 ${analysis.teamCount * 5}명으로 ${analysis.teamCount}팀 편성${reserveText}`,
+    "success"
+  );
+  buildRecruitmentTeamsBtn.disabled = false;
+}
+
+function renderRecruitmentOptions(previousId = "") {
+  recruitmentSelectEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = recruitments.length ? "파티·발쫀컵 모집을 선택하세요" : "불러올 모집이 없어요";
+  recruitmentSelectEl.appendChild(placeholder);
+
+  recruitments.forEach(recruitment => {
+    const option = document.createElement("option");
+    option.value = recruitment.id;
+    option.textContent = `[${recruitmentTypeLabel(recruitment)}] ${recruitment.name} · ${recruitment.memberIds.length}명 · ${formatRecruitmentTime(recruitment.scheduledAt)} · ${recruitmentStatusLabel(recruitment)}`;
+    recruitmentSelectEl.appendChild(option);
+  });
+
+  recruitmentSelectEl.disabled = recruitments.length === 0;
+  if (previousId && recruitments.some(item => item.id === previousId)) {
+    recruitmentSelectEl.value = previousId;
+  }
+  refreshRecruitmentPreview();
+}
+
+async function loadRecruitments() {
+  if (!isConfigReady() || !initFirebase()) {
+    setRecruitmentStatus("Firebase 연결 설정을 확인해주세요.", "error");
+    return;
+  }
+
+  const previousId = recruitmentSelectEl.value;
+  reloadRecruitmentsBtn.disabled = true;
+  recruitmentSelectEl.disabled = true;
+  buildRecruitmentTeamsBtn.disabled = true;
+  setRecruitmentStatus("Discord 모집 참가자를 불러오는 중...");
+
+  try {
+    const snap = await firebase.firestore().collection(TOOLKIT_RECRUITMENT_COLLECTION).get();
+    recruitments = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        kind: data.kind === "event" ? "event" : "party",
+        sourceId: String(data.source_id || ""),
+        guildId: String(data.guild_id || ""),
+        name: String(data.name || "이름 없는 모집"),
+        scheduledAt: data.scheduled_at || null,
+        status: String(data.status || "open"),
+        maxMembers: Number(data.max_members) || null,
+        memberIds: Array.isArray(data.member_ids) ? data.member_ids.map(String) : []
+      };
+    }).sort((a, b) => timestampMillis(b.scheduledAt) - timestampMillis(a.scheduledAt));
+
+    renderRecruitmentOptions(previousId);
+    if (!recruitments.length) {
+      setRecruitmentStatus("아직 불러올 파티나 발쫀컵 모집이 없어요.");
+    }
+  } catch (error) {
+    console.error("[toolkit_recruitments] 불러오기 실패:", error);
+    recruitments = [];
+    renderRecruitmentOptions();
+    setRecruitmentStatus("모집을 불러오지 못했어요. 봇 업데이트와 Firestore 읽기 규칙을 확인해주세요.", "error");
+  } finally {
+    reloadRecruitmentsBtn.disabled = false;
+  }
+}
+
+function multiTeamMetric(teams) {
+  const scores = teams.map(team => teamScore(team, SCORE_MODE_INTERNAL));
+  const highest = Math.max(...scores);
+  const lowest = Math.min(...scores);
+  const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const deviation = scores.reduce((sum, score) => sum + Math.abs(score - average), 0);
+  const sortedTeamScores = teams.map(team =>
+    team.map(member => memberScore(member, SCORE_MODE_INTERNAL)).sort((a, b) => b - a)
+  );
+  let composition = 0;
+  for (let slot = 0; slot < 5; slot++) {
+    const slotScores = sortedTeamScores.map(scoresInTeam => scoresInTeam[slot]);
+    composition += Math.max(...slotScores) - Math.min(...slotScores);
+  }
+  return { spread: highest - lowest, deviation, composition };
+}
+
+function compareMultiTeamMetrics(left, right) {
+  return left.spread - right.spread
+    || left.deviation - right.deviation
+    || left.composition - right.composition;
+}
+
+function multiTeamCandidateKey(teams) {
+  return teams
+    .map(team => team.map(member => member.discordId).sort().join(","))
+    .sort()
+    .join("|");
+}
+
+function snakeMultiTeams(pool, teamCount) {
+  const sorted = shuffle([...pool]).sort(
+    (a, b) => memberScore(b, SCORE_MODE_INTERNAL) - memberScore(a, SCORE_MODE_INTERNAL)
+  );
+  const teams = Array.from({ length: teamCount }, () => []);
+  sorted.forEach((member, index) => {
+    const round = Math.floor(index / teamCount);
+    const position = index % teamCount;
+    const teamIndex = round % 2 === 0 ? position : teamCount - 1 - position;
+    teams[teamIndex].push(member);
+  });
+  return teams;
+}
+
+function buildMultiTeamCandidates(pool, teamCount) {
+  const candidates = new Map();
+  const addCandidate = teams => {
+    const key = multiTeamCandidateKey(teams);
+    if (!candidates.has(key)) {
+      candidates.set(key, { teams, key, metric: multiTeamMetric(teams) });
+    }
+  };
+
+  addCandidate(snakeMultiTeams(pool, teamCount));
+  for (let trial = 0; trial < MULTI_TEAM_CANDIDATE_TRIALS; trial++) {
+    const shuffled = shuffle([...pool]);
+    const teams = Array.from(
+      { length: teamCount },
+      (_, index) => shuffled.slice(index * 5, index * 5 + 5)
+    );
+    addCandidate(teams);
+  }
+
+  return [...candidates.values()].sort((a, b) => compareMultiTeamMetrics(a.metric, b.metric));
+}
+
+function multiTeamLabel(index) {
+  let value = index + 1;
+  let label = "";
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+  return label;
+}
+
+function renderRecruitmentResult(recruitment, analysis, candidate) {
+  const teams = candidate.teams.map(team => sortByTier(team, SCORE_MODE_INTERNAL));
+  recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
+  recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${candidate.metric.spread}점`;
+  recruitmentTeamGridEl.innerHTML = teams.map((team, index) => {
+    const color = MULTI_TEAM_COLORS[index % MULTI_TEAM_COLORS.length];
+    const score = teamScore(team, SCORE_MODE_INTERNAL);
+    return `
+      <div class="team-card card multi-team-card" style="--team-color:${color}">
+        <div class="team-header">
+          <span class="team-label">팀 ${multiTeamLabel(index)}</span>
+          <span class="team-meta">${team.length}명 · 내부 티어 ${score}점</span>
+        </div>
+        <div class="team-member-list">${teamRowsHtml(team, SCORE_MODE_INTERNAL)}</div>
+      </div>
+    `;
+  }).join("");
+
+  if (analysis.reserves.length) {
+    const knownReserves = analysis.reserves.filter(entry => entry.member).map(entry => entry.member);
+    const unknownReserves = analysis.reserves.filter(entry => !entry.member);
+    recruitmentReserveListEl.innerHTML = `
+      <span class="recruitment-reserve-title">🪑 후보 ${analysis.reserves.length}명 · 참가 신청 순서 기준</span>
+      <div class="team-member-list">
+        ${teamRowsHtml(knownReserves, SCORE_MODE_INTERNAL)}
+        ${unknownReserves.map(entry => `
+          <div class="team-member-row">
+            <span class="team-member-name">정보 없는 참가자</span>
+            <span class="team-member-riot">Discord ID ${entry.id}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+    recruitmentReserveListEl.classList.remove("hidden");
+  } else {
+    recruitmentReserveListEl.innerHTML = "";
+    recruitmentReserveListEl.classList.add("hidden");
+  }
+
+  lastRecruitmentResult = { recruitment, analysis, teams, candidateKey: candidate.key };
+  recruitmentResultEl.classList.remove("hidden");
+  recruitmentResultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function buildRecruitmentTeams(reroll = false) {
+  const recruitment = selectedRecruitment();
+  if (!recruitment) return;
+  const analysis = analyzeRecruitment(recruitment);
+  if (
+    analysis.teamCount < 2
+    || analysis.missingMainIds.length
+    || analysis.missingTierMembers.length
+  ) {
+    refreshRecruitmentPreview();
+    return;
+  }
+
+  const candidates = buildMultiTeamCandidates(analysis.mainMembers, analysis.teamCount);
+  if (!candidates.length) {
+    setRecruitmentStatus("균형 팀 구성을 만들지 못했어요. 다시 시도해주세요.", "error");
+    return;
+  }
+
+  let candidate = candidates[0];
+  if (reroll && lastRecruitmentResult) {
+    const nearBest = candidates.slice(0, Math.min(12, candidates.length));
+    const alternatives = nearBest.filter(item => item.key !== lastRecruitmentResult.candidateKey);
+    if (alternatives.length) {
+      candidate = alternatives[Math.floor(Math.random() * alternatives.length)];
+    }
+  }
+  renderRecruitmentResult(recruitment, analysis, candidate);
+}
+
+function buildRecruitmentResultText() {
+  if (!lastRecruitmentResult) return "";
+  const { recruitment, analysis, teams } = lastRecruitmentResult;
+  const lines = [
+    `[${recruitmentTypeLabel(recruitment)} · ${recruitment.name}]`,
+    "[발쫀잼 내부 티어 기준]"
+  ];
+
+  teams.forEach((team, index) => {
+    lines.push("", `팀 ${multiTeamLabel(index)} (${teamScore(team, SCORE_MODE_INTERNAL)}점)`);
+    lines.push(...team.map(member => memberLine(member, SCORE_MODE_INTERNAL)));
+  });
+
+  if (analysis.reserves.length) {
+    lines.push("", `후보 (${analysis.reserves.length}명 · 참가 신청 순서 기준)`);
+    analysis.reserves.forEach(entry => {
+      lines.push(entry.member ? memberLine(entry.member, SCORE_MODE_INTERNAL) : `  정보 없는 참가자 (${entry.id})`);
+    });
+  }
+  return lines.join("\n");
+}
+
+recruitmentSelectEl.addEventListener("change", refreshRecruitmentPreview);
+reloadRecruitmentsBtn.addEventListener("click", loadRecruitments);
+buildRecruitmentTeamsBtn.addEventListener("click", () => buildRecruitmentTeams(false));
+rerollRecruitmentTeamsBtn.addEventListener("click", () => buildRecruitmentTeams(true));
+copyRecruitmentResultBtn.addEventListener("click", () => {
+  copyTextToClipboard(buildRecruitmentResultText()).then(() => {
+    copyRecruitmentResultBtn.textContent = "✅ 복사됨!";
+    setTimeout(() => { copyRecruitmentResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
+  }).catch(() => {
+    copyRecruitmentResultBtn.textContent = "복사 실패";
+    setTimeout(() => { copyRecruitmentResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
+  });
+});
 
 // users 컬렉션 → 팀짜기용 members 배열
 async function loadMembers() {
@@ -1224,6 +1605,7 @@ async function loadMembers() {
       if (!d.name) return;
       const storedInternalTier = INTERNAL_TIER_INFO[d.internal_tier] ? d.internal_tier : null;
       loaded.push({
+        discordId: String(d.discord_id || doc.id),
         name: d.name,
         studentId: d.student_id || "",
         riotId: d.riot_id || "",
@@ -1244,6 +1626,7 @@ async function loadMembers() {
     }
     copyInternalTiersBtn.disabled = !members.some(member => member.internalTier);
     updateSelectedCount();
+    if (recruitmentSelectEl.value) refreshRecruitmentPreview();
   } catch (e) {
     console.error("[users] 불러오기 실패:", e);
     showMemberMessage("멤버를 불러오지 못했어요. Firestore 권한(users 읽기)과 설정을 확인해주세요.");
@@ -1258,4 +1641,10 @@ if (reloadMembersBtn) {
 
 // 초기 로드
 updateSelectedCount();
-loadMembers();
+
+async function initializeTeamBuilder() {
+  await loadMembers();
+  await loadRecruitments();
+}
+
+initializeTeamBuilder();

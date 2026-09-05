@@ -486,6 +486,125 @@ button:disabled {
   gap: 20px;
 }
 
+.recruitment-loader {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-color: rgba(255, 209, 102, 0.24);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.08), rgba(255, 70, 85, 0.05));
+}
+
+.recruitment-loader-head,
+.recruitment-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.recruitment-loader-title,
+.recruitment-result-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 900;
+}
+
+.recruitment-loader-desc {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.recruitment-loader-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.recruitment-select {
+  min-width: 0;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #191c25;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.recruitment-select:focus {
+  border-color: rgba(255, 209, 102, 0.55);
+}
+
+.recruitment-select:disabled {
+  opacity: 0.55;
+}
+
+.recruitment-status {
+  min-height: 1.3em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.recruitment-status.success { color: #6ee7a8; }
+.recruitment-status.warning { color: #ffd166; }
+.recruitment-status.error { color: #ff7b86; }
+
+.recruitment-result {
+  padding: 22px;
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 209, 102, 0.04);
+}
+
+.recruitment-result-label {
+  display: block;
+  margin-bottom: 5px;
+  color: #ffd166;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.multi-team-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.multi-team-card {
+  border-top: 3px solid var(--team-color, #ff4655);
+}
+
+.multi-team-card .team-label {
+  color: var(--team-color, #ff4655);
+}
+
+.recruitment-reserves {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px dashed rgba(255, 209, 102, 0.3);
+  border-radius: 14px;
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.recruitment-reserves.hidden {
+  display: none;
+}
+
+.recruitment-reserve-title {
+  display: block;
+  margin-bottom: 8px;
+  color: #ffd166;
+  font-size: 0.85rem;
+  font-weight: 900;
+}
+
 .team-controls {
   padding: 22px;
   display: flex;
@@ -1413,6 +1532,20 @@ button:disabled {
 }
 
 @media (max-width: 768px) {
+  .recruitment-loader-head,
+  .recruitment-result-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .recruitment-loader-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .recruitment-loader-actions .primary-btn {
+    width: 100%;
+  }
+
   .member-grid {
     grid-template-columns: repeat(2, 1fr);
   }
