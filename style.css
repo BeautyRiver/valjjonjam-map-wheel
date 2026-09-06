@@ -557,6 +557,52 @@ button:disabled {
 .recruitment-status.warning { color: #ffd166; }
 .recruitment-status.error { color: #ff7b86; }
 
+.recruitment-selection-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.recruitment-selection-panel.hidden {
+  display: none;
+}
+
+.recruitment-selection-guide {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.recruitment-selection-guide.warning { color: #ffd166; }
+.recruitment-selection-guide.success { color: #6ee7a8; }
+
+.recruitment-selection-state {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.recruitment-selection-state.main {
+  border: 1px solid rgba(110, 231, 168, 0.28);
+  background: rgba(110, 231, 168, 0.12);
+  color: #6ee7a8;
+}
+
+.recruitment-selection-state.reserve {
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  background: rgba(255, 209, 102, 0.1);
+  color: #ffd166;
+}
+
 .recruitment-result {
   padding: 22px;
   border: 1px solid rgba(255, 209, 102, 0.22);
@@ -1544,6 +1590,11 @@ button:disabled {
 
   .recruitment-loader-actions .primary-btn {
     width: 100%;
+  }
+
+  .recruitment-selection-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .member-grid {

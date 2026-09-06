@@ -120,8 +120,8 @@
                 <div class="recruitment-loader card">
                     <div class="recruitment-loader-head">
                         <div>
-                            <h2 class="recruitment-loader-title">⚡ 모집 참가자 자동 편성</h2>
-                            <p class="recruitment-loader-desc">Discord 파티·발쫀컵 참가자를 불러와 발쫀잼 내부 티어로 자동 편성합니다.</p>
+                            <h2 class="recruitment-loader-title">⚡ 모집 참가자 불러오기</h2>
+                            <p class="recruitment-loader-desc">Discord 파티·발쫀컵 참가자를 자동 선택한 뒤 원하는 티어 기준으로 팀을 편성합니다.</p>
                         </div>
                         <button id="reloadRecruitmentsBtn" class="sm-btn secondary-btn">🔄 모집 새로고침</button>
                     </div>
@@ -129,26 +129,9 @@
                         <select id="recruitmentSelect" class="recruitment-select" disabled>
                             <option value="">모집 목록을 불러오는 중...</option>
                         </select>
-                        <button id="buildRecruitmentTeamsBtn" class="primary-btn" disabled>🏆 참가자로 팀 짜기</button>
+                        <button id="selectRecruitmentMembersBtn" class="primary-btn" disabled>✅ 참가자들 자동 선택</button>
                     </div>
                     <p id="recruitmentStatus" class="recruitment-status" aria-live="polite">Firebase 모집 목록을 확인하고 있어요.</p>
-                </div>
-
-                <!-- 모집 참가자 자동 편성 결과 -->
-                <div id="recruitmentResult" class="team-result recruitment-result hidden">
-                    <div class="recruitment-result-head">
-                        <div>
-                            <span class="recruitment-result-label">🏆 발쫀잼 내부 티어 자동 편성</span>
-                            <h2 id="recruitmentResultTitle" class="recruitment-result-title"></h2>
-                        </div>
-                        <span id="recruitmentResultSummary" class="selected-badge"></span>
-                    </div>
-                    <div id="recruitmentTeamGrid" class="team-result-grid multi-team-grid"></div>
-                    <div id="recruitmentReserveList" class="recruitment-reserves hidden"></div>
-                    <div class="result-actions">
-                        <button id="rerollRecruitmentTeamsBtn" class="primary-btn">🎲 다른 균형으로 다시 짜기</button>
-                        <button id="copyRecruitmentResultBtn" class="secondary-btn">📋 결과 복사하기</button>
-                    </div>
                 </div>
 
                 <!-- 컨트롤 영역 -->
@@ -185,9 +168,13 @@
                         <span id="selectedCount" class="selected-badge">0명 선택됨</span>
                     </div>
                     <p class="internal-tier-guide">
-                        🏆 발쫀잼 티어 점수: 1티어 10점 · 2상/하 9/8점 · 3상/하 7/6점 ·
-                        4상/하 5/4점 · 5상/하 3/2점 · <strong>?는 -하와 동일</strong>
+                        🏆 발쫀잼 티어 점수: 1티어 10점 · 2상/중/하 9/8.5/8점 · 3상/중/하 7/6.5/6점 ·
+                        4상/중/하 5/4.5/4점 · 5상/중/하 3/2.5/2점 · <strong>?는 -하와 동일</strong>
                     </p>
+                    <div id="recruitmentTeamControls" class="recruitment-selection-panel hidden">
+                        <p id="recruitmentSelectionGuide" class="recruitment-selection-guide" aria-live="polite"></p>
+                        <button id="exitRecruitmentModeBtn" class="sm-btn secondary-btn">자동 선택 종료</button>
+                    </div>
                 </div>
 
                 <!-- 멤버 그리드 -->
@@ -196,9 +183,26 @@
                 <!-- 팀짜기 버튼 -->
                 <div class="team-action-bar">
                     <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 인게임 티어 밸런스</button>
-                    <button id="internalBalanceTeamBtn" class="primary-btn" title="10명 선택 시 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
+                    <button id="internalBalanceTeamBtn" class="primary-btn" title="필요 인원을 모두 선택하면 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
                     <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
                     <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
+                </div>
+
+                <!-- 모집 참가자 자동 편성 결과 -->
+                <div id="recruitmentResult" class="team-result recruitment-result hidden">
+                    <div class="recruitment-result-head">
+                        <div>
+                            <span id="recruitmentResultLabel" class="recruitment-result-label"></span>
+                            <h2 id="recruitmentResultTitle" class="recruitment-result-title"></h2>
+                        </div>
+                        <span id="recruitmentResultSummary" class="selected-badge"></span>
+                    </div>
+                    <div id="recruitmentTeamGrid" class="team-result-grid multi-team-grid"></div>
+                    <div id="recruitmentReserveList" class="recruitment-reserves hidden"></div>
+                    <div class="result-actions">
+                        <button id="rerollRecruitmentTeamsBtn" class="primary-btn">🎲 다른 균형으로 다시 짜기</button>
+                        <button id="copyRecruitmentResultBtn" class="secondary-btn">📋 결과 복사하기</button>
+                    </div>
                 </div>
 
                 <!-- 직접 팀짜기 -->
