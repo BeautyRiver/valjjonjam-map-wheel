@@ -487,7 +487,7 @@ function renderMemberGrid() {
     const namePrefix = m.studentId ? `${m.studentId} ` : "";
     const isRecruitmentParticipant = activeRecruitmentParticipantIds?.has(m.discordId);
     const recruitmentState = activeRecruitment && (isSelected || isRecruitmentParticipant)
-      ? `<span class="recruitment-selection-state ${isSelected ? "main" : "reserve"}">${isSelected ? "본선" : "참가 후보"}</span>`
+      ? `<span class="recruitment-selection-state ${isSelected ? "main" : "reserve"}">${isSelected ? "선택됨" : "대기"}</span>`
       : "";
 
     return `
@@ -547,7 +547,7 @@ function updateSelectedCount() {
 
     const shortage = limit - count;
     recruitmentSelectionGuideEl.textContent = ready
-      ? "✅ 자동 선택 완료 · 교체하려면 본선 멤버를 먼저 해제한 뒤 다른 멤버를 선택하세요."
+      ? "✅ 자동 선택 완료 · 교체하려면 선택된 멤버를 먼저 해제한 뒤 다른 멤버를 선택하세요."
       : `⚠️ ${shortage}명을 더 선택해주세요. 모집에 없던 멤버도 선택할 수 있어요.`;
     recruitmentSelectionGuideEl.className = `recruitment-selection-guide ${ready ? "success" : "warning"}`;
     return;
@@ -1257,6 +1257,18 @@ const copyRecruitmentResultBtn = document.getElementById("copyRecruitmentResultB
 const TOOLKIT_RECRUITMENT_COLLECTION = "toolkit_recruitments";
 const MULTI_TEAM_CANDIDATE_TRIALS = 2000;
 const MULTI_TEAM_COLORS = ["#ff4655", "#7c5cff", "#00c8ee", "#52d981", "#ffd166", "#ff8f70"];
+const PARTY_PREFERRED_TIER_LABELS = {
+  free: "자유 모집",
+  unrated: "일반전",
+  iron_bronze: "아이언~브론즈",
+  bronze_silver: "브론즈~실버",
+  silver_gold: "실버~골드",
+  gold_platinum: "골드~플래티넘",
+  platinum_diamond: "플래티넘~다이아",
+  diamond_ascendant: "다이아~초월자",
+  ascendant_immortal: "초월자~불멸",
+  immortal_plus: "불멸 이상"
+};
 
 let recruitments = [];
 let lastRecruitmentResult = null;
@@ -1312,10 +1324,14 @@ function recruitmentTypeLabel(recruitment) {
   return "파티";
 }
 
+function recruitmentPreferredTierLabel(recruitment) {
+  return PARTY_PREFERRED_TIER_LABELS[recruitment.preferredTier] || PARTY_PREFERRED_TIER_LABELS.free;
+}
+
 function recruitmentStatusLabel(recruitment) {
   if (timestampMillis(recruitment.scheduledAt) <= Date.now()) return "마감";
   if (recruitment.status === "closed") return "마감";
-  if (recruitment.status === "full") return "정원 마감";
+  if (recruitment.status === "full") return "대기 접수 중";
   return "모집 중";
 }
 
@@ -1330,7 +1346,7 @@ function selectedRecruitment() {
 
 function recruitmentParticipantIds(recruitment) {
   const seen = new Set();
-  return recruitment.memberIds.filter(id => {
+  return [...recruitment.memberIds, ...(recruitment.waitlistIds || [])].filter(id => {
     if (seen.has(id)) return false;
     seen.add(id);
     return true;
@@ -1371,7 +1387,7 @@ function autoSelectActiveRecruitment() {
 
   const missingCount = targetIds.length - selectedIndices.size;
   const candidateCount = Math.max(0, participantIds.length - selectedTeamCount * 5);
-  const candidateText = candidateCount ? ` · 후보 ${candidateCount}명` : "";
+  const candidateText = candidateCount ? ` · 대기 ${candidateCount}명` : "";
   const missingText = missingCount ? ` · 기본설정 정보 없음 ${missingCount}명` : "";
   setRecruitmentStatus(
     `${participantIds.length}명 중 ${selectedIndices.size}명 자동 선택${candidateText}${missingText}`,
@@ -1451,7 +1467,7 @@ function refreshRecruitmentPreview() {
 
   const selectedCount = teamCount * 5;
   const reserveCount = participantCount - selectedCount;
-  const reserveText = reserveCount ? ` · 후보 ${reserveCount}명` : "";
+  const reserveText = reserveCount ? ` · 대기 ${reserveCount}명` : "";
   setRecruitmentStatus(
     `${participantCount}명 참가 · 누르면 ${selectedCount}명이 자동 선택됩니다${reserveText}.`,
     "success"
@@ -1468,7 +1484,14 @@ function renderRecruitmentOptions(previousId = "") {
   recruitments.forEach(recruitment => {
     const option = document.createElement("option");
     option.value = recruitment.id;
-    option.textContent = `[${recruitmentTypeLabel(recruitment)}] ${recruitment.name} · ${recruitment.memberIds.length}명 · ${formatRecruitmentTime(recruitment.scheduledAt)} · ${recruitmentStatusLabel(recruitment)}`;
+    const waitlistCount = recruitment.waitlistIds?.length || 0;
+    const waitlistText = waitlistCount
+      ? ` + 대기 ${waitlistCount}명`
+      : "";
+    const tierText = recruitment.kind === "party"
+      ? ` · ${recruitmentPreferredTierLabel(recruitment)}`
+      : "";
+    option.textContent = `[${recruitmentTypeLabel(recruitment)}] ${recruitment.name} · 확정 ${recruitment.memberIds.length}명${waitlistText}${tierText} · ${formatRecruitmentTime(recruitment.scheduledAt)} · ${recruitmentStatusLabel(recruitment)}`;
     recruitmentSelectEl.appendChild(option);
   });
 
@@ -1504,7 +1527,9 @@ async function loadRecruitments() {
         scheduledAt: data.scheduled_at || null,
         status: String(data.status || "open"),
         maxMembers: Number(data.max_members) || null,
-        memberIds: Array.isArray(data.member_ids) ? data.member_ids.map(String) : []
+        memberIds: Array.isArray(data.member_ids) ? data.member_ids.map(String) : [],
+        waitlistIds: Array.isArray(data.waitlist_ids) ? data.waitlist_ids.map(String) : [],
+        preferredTier: String(data.preferred_tier || "free")
       };
     }).sort((a, b) => timestampMillis(b.scheduledAt) - timestampMillis(a.scheduledAt));
 
@@ -1624,7 +1649,7 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
     const knownReserves = analysis.reserves.filter(entry => entry.member).map(entry => entry.member);
     const unknownReserves = analysis.reserves.filter(entry => !entry.member);
     recruitmentReserveListEl.innerHTML = `
-      <span class="recruitment-reserve-title">🪑 후보 ${analysis.reserves.length}명 · 현재 미선택</span>
+      <span class="recruitment-reserve-title">🪑 대기 ${analysis.reserves.length}명 · 현재 미선택</span>
       <div class="team-member-list">
         ${teamRowsHtml(knownReserves, scoreMode)}
         ${unknownReserves.map(entry => `
@@ -1724,7 +1749,7 @@ function buildRecruitmentResultText() {
   });
 
   if (analysis.reserves.length) {
-    lines.push("", `후보 (${analysis.reserves.length}명 · 현재 미선택)`);
+    lines.push("", `대기 (${analysis.reserves.length}명 · 현재 미선택)`);
     analysis.reserves.forEach(entry => {
       lines.push(entry.member ? memberLine(entry.member, scoreMode) : `  정보 없는 참가자 (${entry.id})`);
     });
