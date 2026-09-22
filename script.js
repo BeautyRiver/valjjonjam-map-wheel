@@ -1318,10 +1318,15 @@ function formatRecruitmentTime(value) {
 }
 
 function recruitmentTypeLabel(recruitment) {
-  if (recruitment.kind === "event") return "발쫀컵";
+  if (recruitment.kind === "event") return "발쫀전";
+  if (isGauntletRecruitment(recruitment)) return "건틀릿 내전 (16명)";
   if (recruitment.maxMembers === 10) return "내전";
   if (recruitment.maxMembers === 5) return "5인큐";
   return "파티";
+}
+
+function isGauntletRecruitment(recruitment) {
+  return recruitment.kind === "party" && recruitment.maxMembers === 16;
 }
 
 function recruitmentPreferredTierLabel(recruitment) {
@@ -1398,6 +1403,10 @@ function autoSelectActiveRecruitment() {
 function activateRecruitmentSelection() {
   const recruitment = selectedRecruitment();
   if (!recruitment) return;
+  if (isGauntletRecruitment(recruitment)) {
+    refreshRecruitmentPreview();
+    return;
+  }
   const participantIds = recruitmentParticipantIds(recruitment);
 
   activeRecruitment = recruitment;
@@ -1449,6 +1458,14 @@ function refreshRecruitmentPreview() {
     return;
   }
 
+  if (isGauntletRecruitment(recruitment)) {
+    setRecruitmentStatus(
+      `건틀릿 참가 확정 ${recruitment.memberIds.length} / 16명 · 대기 ${recruitment.waitlistIds?.length || 0}명 · 건틀릿 팀 편성은 아직 지원하지 않아요.`,
+      "warning"
+    );
+    return;
+  }
+
   const participantCount = recruitmentParticipantIds(recruitment).length;
   const teamCount = Math.floor(participantCount / 5);
   if (!participantCount) {
@@ -1478,7 +1495,7 @@ function renderRecruitmentOptions(previousId = "") {
   recruitmentSelectEl.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = recruitments.length ? "파티·발쫀컵 모집을 선택하세요" : "불러올 모집이 없어요";
+  placeholder.textContent = recruitments.length ? "파티·발쫀전 모집을 선택하세요" : "불러올 모집이 없어요";
   recruitmentSelectEl.appendChild(placeholder);
 
   recruitments.forEach(recruitment => {
@@ -1535,7 +1552,7 @@ async function loadRecruitments() {
 
     renderRecruitmentOptions(previousId);
     if (!recruitments.length) {
-      setRecruitmentStatus("아직 불러올 파티나 발쫀컵 모집이 없어요.");
+      setRecruitmentStatus("아직 불러올 파티나 발쫀전 모집이 없어요.");
     }
   } catch (error) {
     console.error("[toolkit_recruitments] 불러오기 실패:", error);
