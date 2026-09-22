@@ -1505,7 +1505,7 @@ function renderRecruitmentOptions(previousId = "") {
     const waitlistText = waitlistCount
       ? ` + 대기 ${waitlistCount}명`
       : "";
-    const tierText = recruitment.kind === "party"
+    const tierText = recruitment.kind === "party" && recruitment.maxMembers === 5
       ? ` · ${recruitmentPreferredTierLabel(recruitment)}`
       : "";
     option.textContent = `[${recruitmentTypeLabel(recruitment)}] ${recruitment.name} · 확정 ${recruitment.memberIds.length}명${waitlistText}${tierText} · ${formatRecruitmentTime(recruitment.scheduledAt)} · ${recruitmentStatusLabel(recruitment)}`;
