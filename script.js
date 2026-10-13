@@ -1319,14 +1319,9 @@ function formatRecruitmentTime(value) {
 
 function recruitmentTypeLabel(recruitment) {
   if (recruitment.kind === "event") return "발쫀전";
-  if (isGauntletRecruitment(recruitment)) return "건틀릿 내전 (16명)";
   if (recruitment.maxMembers === 10) return "내전";
   if (recruitment.maxMembers === 5) return "5인큐";
   return "파티";
-}
-
-function isGauntletRecruitment(recruitment) {
-  return recruitment.kind === "party" && recruitment.maxMembers === 16;
 }
 
 function recruitmentPreferredTierLabel(recruitment) {
@@ -1403,10 +1398,6 @@ function autoSelectActiveRecruitment() {
 function activateRecruitmentSelection() {
   const recruitment = selectedRecruitment();
   if (!recruitment) return;
-  if (isGauntletRecruitment(recruitment)) {
-    refreshRecruitmentPreview();
-    return;
-  }
   const participantIds = recruitmentParticipantIds(recruitment);
 
   activeRecruitment = recruitment;
@@ -1455,14 +1446,6 @@ function refreshRecruitmentPreview() {
 
   if (!recruitment) {
     setRecruitmentStatus("모집을 선택하면 참가자를 자동으로 체크할 수 있어요.");
-    return;
-  }
-
-  if (isGauntletRecruitment(recruitment)) {
-    setRecruitmentStatus(
-      `건틀릿 참가 확정 ${recruitment.memberIds.length} / 16명 · 대기 ${recruitment.waitlistIds?.length || 0}명 · 건틀릿 팀 편성은 아직 지원하지 않아요.`,
-      "warning"
-    );
     return;
   }
 
@@ -1548,7 +1531,9 @@ async function loadRecruitments() {
         waitlistIds: Array.isArray(data.waitlist_ids) ? data.waitlist_ids.map(String) : [],
         preferredTier: String(data.preferred_tier || "free")
       };
-    }).sort((a, b) => timestampMillis(b.scheduledAt) - timestampMillis(a.scheduledAt));
+    }).filter(recruitment =>
+      recruitment.kind === "event" || [5, 10].includes(recruitment.maxMembers)
+    ).sort((a, b) => timestampMillis(b.scheduledAt) - timestampMillis(a.scheduledAt));
 
     renderRecruitmentOptions(previousId);
     if (!recruitments.length) {
