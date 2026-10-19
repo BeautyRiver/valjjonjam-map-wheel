@@ -305,21 +305,23 @@ function tierScore(tier) {
 // 내전·5인큐 기록으로 정리한 발쫀잼 내부 티어.
 // ? 표시는 유지하되 점수는 같은 티어의 -하와 동일하게 계산한다.
 const INTERNAL_TIER_INFO = {
-  "1":  { label: "1티어", score: 10, level: 1 },
-  "2상": { label: "2티어 -상", score: 9, level: 2 },
-  "2중": { label: "2티어 -중", score: 8.5, level: 2 },
-  "2하": { label: "2티어 -하", score: 8, level: 2 },
-  "3상": { label: "3티어 -상", score: 7, level: 3 },
-  "3중": { label: "3티어 -중", score: 6.5, level: 3 },
-  "3하": { label: "3티어 -하", score: 6, level: 3 },
-  "4상": { label: "4티어 -상", score: 5, level: 4 },
-  "4중": { label: "4티어 -중", score: 4.5, level: 4 },
-  "4하": { label: "4티어 -하", score: 4, level: 4 },
-  "4?":  { label: "4티어 ?", score: 4, level: 4 },
+  "1":  { label: "1티어", score: 17, level: 1 },
+  "2상": { label: "2티어 -상", score: 15, level: 2 },
+  "2중": { label: "2티어 -중", score: 14, level: 2 },
+  "2하": { label: "2티어 -하", score: 13, level: 2 },
+  "2?":  { label: "2티어 ?", score: 13, level: 2 },
+  "3상": { label: "3티어 -상", score: 11, level: 3 },
+  "3중": { label: "3티어 -중", score: 10, level: 3 },
+  "3하": { label: "3티어 -하", score: 9, level: 3 },
+  "3?":  { label: "3티어 ?", score: 9, level: 3 },
+  "4상": { label: "4티어 -상", score: 7, level: 4 },
+  "4중": { label: "4티어 -중", score: 6, level: 4 },
+  "4하": { label: "4티어 -하", score: 5, level: 4 },
+  "4?":  { label: "4티어 ?", score: 5, level: 4 },
   "5상": { label: "5티어 -상", score: 3, level: 5 },
-  "5중": { label: "5티어 -중", score: 2.5, level: 5 },
-  "5하": { label: "5티어 -하", score: 2, level: 5 },
-  "5?":  { label: "5티어 ?", score: 2, level: 5 }
+  "5중": { label: "5티어 -중", score: 2, level: 5 },
+  "5하": { label: "5티어 -하", score: 1, level: 5 },
+  "5?":  { label: "5티어 ?", score: 1, level: 5 }
 };
 
 function normalizeMemberName(name) {
@@ -465,7 +467,9 @@ function getFilteredMembers() {
       }
     }
     const matchInternalTier = activeInternalFilter === "all"
-      || INTERNAL_TIER_INFO[m.internalTier]?.level === Number(activeInternalFilter);
+      || (activeInternalFilter === "unclassified"
+        ? !INTERNAL_TIER_INFO[m.internalTier]
+        : INTERNAL_TIER_INFO[m.internalTier]?.level === Number(activeInternalFilter));
     return matchSearch && matchTier && matchInternalTier;
   });
 }
@@ -829,11 +833,13 @@ function buildBalancedCandidates() {
   if (!all.length) return [];
 
   // 최소 점수차 근처(밴드)만 남기되, 후보가 너무 적으면 밴드를 넓힘
+  // 내부 티어 점수 간격을 2배로 바꿔도 기존 후보 허용 범위는 유지한다.
   const minDiff = all[0].diff;
-  let band = 6;
+  const scoreScale = activeScoreMode === SCORE_MODE_INTERNAL ? 2 : 1;
+  let band = 6 * scoreScale;
   let near = all.filter(c => c.diff <= minDiff + band);
-  while (near.length < 6 && band < 40) {
-    band += 6;
+  while (near.length < 6 && band < 40 * scoreScale) {
+    band += 6 * scoreScale;
     near = all.filter(c => c.diff <= minDiff + band);
   }
   return shuffle(near);  // 누를 때마다 다른 근접 구성
