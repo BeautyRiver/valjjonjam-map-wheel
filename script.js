@@ -432,6 +432,7 @@ const memberSearchEl = document.getElementById("memberSearch");
 const selectedCountEl = document.getElementById("selectedCount");
 const balanceTeamBtn  = document.getElementById("balanceTeamBtn");
 const internalBalanceTeamBtn = document.getElementById("internalBalanceTeamBtn");
+const teamBuilderNoticeEl = document.getElementById("teamBuilderNotice");
 const randomTeamBtn   = document.getElementById("randomTeamBtn");
 const manualTeamBtn   = document.getElementById("manualTeamBtn");
 const manualSectionEl = document.getElementById("manualSection");
@@ -536,7 +537,14 @@ function renderMemberGrid() {
   });
 }
 
+function setTeamBuilderNotice(message = "") {
+  teamBuilderNoticeEl.textContent = message;
+  teamBuilderNoticeEl.classList.toggle("hidden", !message);
+  if (message) teamBuilderNoticeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
 function updateSelectedCount() {
+  setTeamBuilderNotice();
   const count = selectedIndices.size;
   const limit = currentSelectionLimit();
 
@@ -856,6 +864,7 @@ const saveMinDiffBtn     = document.getElementById("saveMinDiffBtn");
 const saveRandomBtn      = document.getElementById("saveRandomBtn");
 
 let modalTrio = [];   // 현재 모달에 떠있는 3개 후보
+let recruitmentBalanceContext = null;
 
 // 저장된 구성 제외하고 근접 후보 3개 뽑기
 function pickBalanceTrio() {
@@ -865,7 +874,10 @@ function pickBalanceTrio() {
   const fresh = cands.filter(c =>
     !savedKeys.has(teamsKey(c.aIds.map(i => members[i]), c.bIds.map(i => members[i])))
   );
-  return (fresh.length ? fresh : cands).slice(0, 3);
+  const saved = cands.filter(c =>
+    savedKeys.has(teamsKey(c.aIds.map(i => members[i]), c.bIds.map(i => members[i])))
+  );
+  return [...fresh, ...saved].slice(0, 3);
 }
 
 function renderModalTrio() {
@@ -970,6 +982,9 @@ function saveCandidate(c, btn) {
 }
 
 function openBalanceModal() {
+  recruitmentBalanceContext = null;
+  saveMinDiffBtn.classList.remove("hidden");
+  saveRandomBtn.classList.remove("hidden");
   balanceModalTitleEl.textContent = activeScoreMode === SCORE_MODE_INTERNAL
     ? "🏆 발쫀잼 티어 밸런스 후보 3가지"
     : "⚖️ 인게임 티어 밸런스 후보 3가지";
@@ -981,9 +996,11 @@ function openBalanceModal() {
 function closeBalanceModal() {
   balanceModalEl.classList.remove("open");
   balanceModalEl.setAttribute("aria-hidden", "true");
+  recruitmentBalanceContext = null;
 }
 
 balanceTeamBtn.addEventListener("click", () => {
+  setTeamBuilderNotice();
   manualSectionEl.classList.add("hidden");
   activeScoreMode = SCORE_MODE_GAME;
   if (activeRecruitment) {
@@ -996,17 +1013,14 @@ balanceTeamBtn.addEventListener("click", () => {
 internalBalanceTeamBtn.addEventListener("click", () => {
   const missing = [...selectedIndices]
     .map(i => members[i])
-    .filter(member => !member.internalTier);
+    .filter(member => !INTERNAL_TIER_INFO[member.internalTier]);
   if (missing.length) {
-    selectedCountEl.textContent = `내부 티어 미분류: ${missing.map(m => m.name).join(", ")}`;
-    selectedCountEl.classList.add("limit-warn");
-    clearTimeout(internalBalanceTeamBtn._warningTimer);
-    internalBalanceTeamBtn._warningTimer = setTimeout(() => {
-      selectedCountEl.classList.remove("limit-warn");
-      updateSelectedCount();
-    }, 2200);
+    setTeamBuilderNotice(
+      `⚠️ 내부 티어 미분류: ${missing.map(m => m.name).join(", ")} · Discord에서 /내부티어설정 후 새로고침해주세요. 인게임 티어 밸런스는 그대로 사용할 수 있어요.`
+    );
     return;
   }
+  setTeamBuilderNotice();
   manualSectionEl.classList.add("hidden");
   activeScoreMode = SCORE_MODE_INTERNAL;
   if (activeRecruitment) {
@@ -1018,7 +1032,8 @@ internalBalanceTeamBtn.addEventListener("click", () => {
 
 rerollBalanceBtn.addEventListener("click", () => {
   rerollBalanceBtn.classList.add("rolling");
-  renderModalTrio();
+  if (recruitmentBalanceContext) renderRecruitmentBalanceCandidates();
+  else renderModalTrio();
   setTimeout(() => rerollBalanceBtn.classList.remove("rolling"), 500);
 });
 
@@ -1046,6 +1061,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 randomTeamBtn.addEventListener("click", () => {
+  setTeamBuilderNotice();
   manualSectionEl.classList.add("hidden");
   activeScoreMode = SCORE_MODE_GAME;
   if (activeRecruitment) {
@@ -1060,6 +1076,7 @@ randomTeamBtn.addEventListener("click", () => {
 const manualAssign = {}; // index -> 'A' | 'B' | null
 
 function openManualTeam() {
+  setTeamBuilderNotice();
   // 선택된 멤버만 초기화 (기존 배정 유지)
   [...selectedIndices].forEach(i => {
     if (!(i in manualAssign)) manualAssign[i] = null;
@@ -1632,14 +1649,8 @@ function multiTeamLabel(index) {
   return label;
 }
 
-function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, method) {
-  const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
-  recruitmentResultLabelEl.textContent = method === "random"
-    ? "🎲 모집 참가자 랜덤 편성"
-    : `${scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️"} ${scoreModeLabel(scoreMode)} 자동 편성`;
-  recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
-  recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${candidate.metric.spread}점`;
-  recruitmentTeamGridEl.innerHTML = teams.map((team, index) => {
+function multiTeamGridHtml(teams, scoreMode) {
+  return teams.map((team, index) => {
     const color = MULTI_TEAM_COLORS[index % MULTI_TEAM_COLORS.length];
     const score = teamScore(team, scoreMode);
     return `
@@ -1652,6 +1663,70 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
       </div>
     `;
   }).join("");
+}
+
+function openRecruitmentBalanceModal(recruitment, analysis, scoreMode, reroll) {
+  recruitmentBalanceContext = {
+    recruitment, analysis, scoreMode, candidates: [],
+    excludeKey: reroll ? lastRecruitmentResult?.candidateKey : null
+  };
+  modalTrio = [];
+  balanceModalTitleEl.textContent = `${scoreModeLabel(scoreMode)} · ${analysis.teamCount}팀 밸런스 후보 3가지`;
+  saveMinDiffBtn.classList.add("hidden");
+  saveRandomBtn.classList.add("hidden");
+  renderRecruitmentBalanceCandidates();
+  balanceModalEl.classList.add("open");
+  balanceModalEl.setAttribute("aria-hidden", "false");
+}
+
+function renderRecruitmentBalanceCandidates() {
+  const context = recruitmentBalanceContext;
+  if (!context) return;
+  const { recruitment, analysis, scoreMode } = context;
+  const all = buildMultiTeamCandidates(analysis.mainMembers, analysis.teamCount, scoreMode);
+  const previousKeys = new Set(context.candidates.map(candidate => candidate.key));
+  if (context.excludeKey) previousKeys.add(context.excludeKey);
+  const fresh = all.filter(candidate => !previousKeys.has(candidate.key));
+  const previous = all.filter(candidate => previousKeys.has(candidate.key));
+  context.candidates = [...fresh, ...previous].slice(0, 3);
+
+  if (!context.candidates.length) {
+    balanceModalListEl.innerHTML = `<div class="modal-empty">팀 구성을 만들지 못했어요. 선택 인원을 확인한 뒤 다시 시도해주세요.</div>`;
+    return;
+  }
+  balanceModalListEl.innerHTML = context.candidates.map((candidate, index) => {
+    const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
+    return `
+      <div class="modal-option" style="animation-delay:${index * 0.08}s">
+        <div class="opt-head">
+          <span class="opt-title">옵션 ${index + 1}</span>
+          <span class="opt-diff">최대 점수차 ${candidate.metric.spread}</span>
+        </div>
+        <div class="team-result-grid">${multiTeamGridHtml(teams, scoreMode)}</div>
+        <button class="primary-btn opt-apply" data-opt="${index}">이 구성 적용</button>
+      </div>
+    `;
+  }).join("");
+  balanceModalListEl.querySelectorAll(".opt-apply").forEach(button => {
+    button.addEventListener("click", () => {
+      const candidate = context.candidates[Number(button.dataset.opt)];
+      if (!candidate) return;
+      teamResultEl.classList.add("hidden");
+      manualSectionEl.classList.add("hidden");
+      renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, "balance");
+      closeBalanceModal();
+    });
+  });
+}
+
+function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, method) {
+  const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
+  recruitmentResultLabelEl.textContent = method === "random"
+    ? "🎲 모집 참가자 랜덤 편성"
+    : `${scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️"} ${scoreModeLabel(scoreMode)} 자동 편성`;
+  recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
+  recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${candidate.metric.spread}점`;
+  recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode);
 
   if (analysis.reserves.length) {
     const knownReserves = analysis.reserves.filter(entry => entry.member).map(entry => entry.member);
@@ -1688,6 +1763,7 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
 
 function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "balance") {
   if (!activeRecruitment) return;
+  setTeamBuilderNotice();
   const analysis = analyzeActiveRecruitment();
   const requiredCount = selectedTeamCount * 5;
   if (analysis.mainMembers.length !== requiredCount) {
@@ -1695,11 +1771,10 @@ function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "bala
     return;
   }
   if (scoreMode === SCORE_MODE_INTERNAL) {
-    const missing = analysis.mainMembers.filter(member => !member.internalTier);
+    const missing = analysis.mainMembers.filter(member => !INTERNAL_TIER_INFO[member.internalTier]);
     if (missing.length) {
-      setRecruitmentStatus(
-        `내부 티어 미설정: ${missing.map(member => member.name).join(", ")} · /내부티어설정 후 새로고침해주세요.`,
-        "error"
+      setTeamBuilderNotice(
+        `⚠️ 내부 티어 미분류: ${missing.map(member => member.name).join(", ")} · Discord에서 /내부티어설정 후 새로고침해주세요.`
       );
       return;
     }
@@ -1718,24 +1793,8 @@ function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "bala
       metric: multiTeamMetric(teams, scoreMode)
     };
   } else {
-    const candidates = buildMultiTeamCandidates(
-      analysis.mainMembers,
-      selectedTeamCount,
-      scoreMode
-    );
-    if (!candidates.length) {
-      setRecruitmentStatus("균형 팀 구성을 만들지 못했어요. 다시 시도해주세요.", "error");
-      return;
-    }
-
-    candidate = candidates[0];
-    if (reroll && lastRecruitmentResult) {
-      const nearBest = candidates.slice(0, Math.min(12, candidates.length));
-      const alternatives = nearBest.filter(item => item.key !== lastRecruitmentResult.candidateKey);
-      if (alternatives.length) {
-        candidate = alternatives[Math.floor(Math.random() * alternatives.length)];
-      }
-    }
+    openRecruitmentBalanceModal(activeRecruitment, analysis, scoreMode, reroll);
+    return;
   }
 
   teamResultEl.classList.add("hidden");

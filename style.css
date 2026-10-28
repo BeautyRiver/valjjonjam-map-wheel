@@ -746,6 +746,21 @@ button:disabled {
   color: #ffd166;
 }
 
+.team-builder-notice {
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  border-radius: 12px;
+  background: rgba(255, 209, 102, 0.08);
+  color: #ffd166;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.team-builder-notice.hidden,
+.modal-foot button.hidden {
+  display: none;
+}
+
 .select-actions {
   display: flex;
   flex-wrap: wrap;

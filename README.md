@@ -34,3 +34,9 @@
 ```bash
 python -m http.server 8000   # http://localhost:8000
 ```
+
+## 팀짜기 회귀 테스트
+Playwright와 Chromium이 설치된 Node.js 환경에서 `node tests/team-builder.browser.cjs`로 실행합니다.
+설치된 Chrome을 사용할 때는 `BROWSER_EXECUTABLE` 환경변수에 실행 파일 경로를 지정할 수 있습니다.
+실제 Firebase 대신 가상 멤버·모집 데이터로 직접 선택, 10·15·20명 자동 선택, 후보 3개,
+다시 짜기·적용·저장·미분류 안내와 모바일 화면을 검증합니다.

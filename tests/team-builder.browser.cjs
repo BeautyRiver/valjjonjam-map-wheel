@@ -1,0 +1,178 @@
+// Run with Node.js and Playwright installed. No requests reach the real Firebase.
+// BROWSER_EXECUTABLE optionally selects an installed Chrome/Chromium executable.
+const { chromium } = require("playwright");
+const fs = require("node:fs");
+const path = require("node:path");
+const assert = require("node:assert/strict");
+
+const root = path.resolve(__dirname, "..");
+
+async function run() {
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {})
+  });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const tiers = ["1", "2상", "2?", "3중", "3?", "4상", "4중", "4?", "5중", "5?"];
+    const users = Array.from({ length: 25 }, (_, i) => ({
+      id: String(i + 1), name: `테스트${i + 1}`, internal_tier: tiers[i % 10],
+      tier: "골드1", role: ["플렉스"]
+    }));
+    await page.addInitScript(({ users }) => {
+      const recruitments = [10, 15, 20].map(n => ({
+        id: `group${n}`, kind: n === 10 ? "party" : "event", name: `${n}명 테스트`,
+        max_members: n === 10 ? 10 : null,
+        member_ids: users.slice(0, n).map(user => user.id),
+        waitlist_ids: n === 10 ? ["11", "12"] : [],
+        scheduled_at: { seconds: Date.now() / 1000 + 3600 }
+      }));
+      window.firebase = { apps: [{}], firestore: () => ({
+        collection: name => ({ get: async () => {
+          const docs = (name === "users" ? users : recruitments)
+            .map(data => ({ id: data.id, data: () => data }));
+          return { docs, forEach: callback => docs.forEach(callback) };
+        } })
+      }) };
+    }, { users });
+    await page.route("**/*", route => {
+      const url = new URL(route.request().url());
+      if (url.hostname !== "toolkit.test") return route.fulfill({ status: 200, body: "" });
+      const file = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
+      if (file === "config.js") return route.fulfill({
+        contentType: "text/javascript", body: 'const firebaseConfig={apiKey:"test",appId:"test"};'
+      });
+      if (["index.html", "style.css", "script.js"].includes(file)) return route.fulfill({
+        contentType: file.endsWith(".js") ? "text/javascript" : file.endsWith(".css") ? "text/css" : "text/html",
+        body: fs.readFileSync(path.join(root, file))
+      });
+      if (/^valorant_tier_png\/[a-z0-9_-]+\.png$/.test(file) && fs.existsSync(path.join(root, file))) {
+        return route.fulfill({ contentType: "image/png", body: fs.readFileSync(path.join(root, file)) });
+      }
+      return route.fulfill({ status: 200, body: "" });
+    });
+    await page.goto("http://toolkit.test/");
+    await page.click('[data-tab="team"]');
+    await page.waitForSelector(".member-card");
+
+    for (let i = 0; i < 10; i++) await page.locator(".member-card").nth(i).click();
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+    await page.locator("#balanceModalList .opt-save").first().click();
+    assert.equal(await page.locator("#savedBoard .saved-item").count(), 1);
+    await page.click("#rerollBalanceBtn");
+    assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+    await page.click("#balanceModalClose");
+    await page.click("#savedBoard .saved-load");
+    assert.equal(await page.locator("#teamAList .team-member-row").count(), 5);
+    console.log("PASS: direct 10, 3 options, save, reroll and load");
+
+    for (const count of [10, 15, 20]) {
+      await page.selectOption("#recruitmentSelect", `group${count}`);
+      await page.click("#selectRecruitmentMembersBtn");
+      assert.equal(await page.locator(".member-card.selected").count(), count);
+      await page.click("#internalBalanceTeamBtn");
+      await page.waitForSelector("#balanceModal.open");
+      assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+      const first = page.locator("#balanceModalList .modal-option").first();
+      assert.equal(await first.locator(".team-card").count(), count / 5);
+      assert.equal(await first.locator(".team-member-row").count(), count);
+      assert.equal(await page.locator("#saveMinDiffBtn").isVisible(), false);
+      const previous = await page.evaluate(() => recruitmentBalanceContext.candidates.map(candidate => candidate.key));
+      assert.equal(new Set(previous).size, 3);
+      await page.click("#rerollBalanceBtn");
+      const current = await page.evaluate(() => recruitmentBalanceContext.candidates.map(candidate => candidate.key));
+      assert.equal(new Set(current).size, 3);
+      assert.ok(current.every(key => !previous.includes(key)));
+      await page.locator("#balanceModalList .opt-apply").nth(1).click();
+      assert.equal(await page.locator("#balanceModal").evaluate(el => el.classList.contains("open")), false);
+      assert.equal(await page.locator("#recruitmentTeamGrid .team-card").count(), count / 5);
+      const result = await page.evaluate(() => ({
+        ids: lastRecruitmentResult.teams.flat().map(member => member.discordId),
+        key: lastRecruitmentResult.candidateKey, text: buildRecruitmentResultText()
+      }));
+      assert.equal(result.ids.length, count);
+      assert.equal(new Set(result.ids).size, count);
+      assert.equal(result.key, current[1]);
+      assert.ok(result.text.includes("발쫀잼 티어"));
+      if (count === 10) assert.ok(result.text.includes("대기 (2명"));
+      await page.click("#rerollRecruitmentTeamsBtn");
+      await page.waitForSelector("#balanceModal.open");
+      assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+      await page.click("#balanceModalClose");
+      await page.click("#randomTeamBtn");
+      assert.equal(await page.locator("#recruitmentTeamGrid .team-card").count(), count / 5);
+      await page.click("#balanceTeamBtn");
+      await page.waitForSelector("#balanceModal.open");
+      assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+      await page.click("#balanceModalClose");
+      await page.click("#exitRecruitmentModeBtn");
+      console.log(`PASS: auto ${count}, 3 distinct options, apply, reroll, copy, reserves, game/random paths`);
+    }
+
+    await page.selectOption("#recruitmentSelect", "group10");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.locator('.member-card[data-index="0"]').click();
+    await page.locator('.member-card[data-index="24"]').click();
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.ok(await page.evaluate(() => recruitmentBalanceContext.candidates.every(candidate => {
+      const ids = candidate.teams.flat().map(member => member.discordId);
+      return ids.includes("25") && !ids.includes("1");
+    })));
+    await page.click("#balanceModalClose");
+    await page.click("#exitRecruitmentModeBtn");
+    for (let i = 0; i < 10; i++) await page.locator(".member-card").nth(i).click();
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#saveMinDiffBtn").isVisible(), true);
+    await page.click("#balanceModalClose");
+    await page.evaluate(() => { members[0].internalTier = null; renderMemberGrid(); });
+    await page.click("#internalBalanceTeamBtn");
+    assert.equal(await page.locator("#teamBuilderNotice").isVisible(), true);
+    assert.ok((await page.locator("#teamBuilderNotice").textContent()).includes("테스트1"));
+    await page.waitForTimeout(2500);
+    assert.equal(await page.locator("#teamBuilderNotice").isVisible(), true);
+    await page.click("#balanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#teamBuilderNotice").isVisible(), false);
+    await page.click("#balanceModalClose");
+    await page.locator('.member-card[data-index="0"]').click();
+    await page.locator('.member-card[data-index="10"]').click();
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+    await page.click("#balanceModalClose");
+    console.log("PASS: player replacement, direct mode restoration, persistent warning and recovery");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.selectOption("#recruitmentSelect", "group20");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.locator('.member-card[data-index="0"]').click();
+    await page.locator('.member-card[data-index="24"]').click();
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+    assert.ok(await page.locator("#balanceModal .modal-box").evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.left >= 0 && rect.right <= innerWidth + 1;
+    }));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector("#balanceModal .modal-box")).opacity === "1");
+    if (process.env.TEST_SCREENSHOT_PATH) {
+      await page.screenshot({ path: process.env.TEST_SCREENSHOT_PATH, animations: "disabled" });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.screenshot({
+        path: process.env.TEST_SCREENSHOT_PATH.replace(/\.png$/, "-desktop.png"), animations: "disabled"
+      });
+    }
+    assert.deepEqual(errors, []);
+    console.log("PASS: mobile 4-team candidates, no browser JavaScript errors");
+  } finally {
+    await browser.close();
+  }
+}
+
+run().catch(error => { console.error(error); process.exitCode = 1; });
